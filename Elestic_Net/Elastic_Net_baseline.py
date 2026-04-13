@@ -307,18 +307,25 @@ def drop_rows_with_missing_target(X: pd.DataFrame, y: pd.Series):
     y = y.loc[valid_mask].copy()
     return X, y
 
+def to_python_float(x):
+    """Convert Python / NumPy / CuPy scalar-like objects to plain float."""
+    if hasattr(x, "get"):
+        x = x.get()
+    if hasattr(x, "item"):
+        x = x.item()
+    return float(x)
 
 def to_gpu(X_train_pd, X_val_pd, X_test_pd, y_train_pd, y_val_pd, y_test_pd):
     """Move pandas data to GPU."""
     require_rapids()
 
-    X_train = cudf.DataFrame.from_pandas(X_train_pd.astype(np.float32))
-    X_val = cudf.DataFrame.from_pandas(X_val_pd.astype(np.float32))
-    X_test = cudf.DataFrame.from_pandas(X_test_pd.astype(np.float32))
+    X_train = cudf.from_pandas(X_train_pd.astype(np.float32))
+    X_val = cudf.from_pandas(X_val_pd.astype(np.float32))
+    X_test = cudf.from_pandas(X_test_pd.astype(np.float32))
 
-    y_train = cudf.Series(y_train_pd.astype(np.float32).values)
-    y_val = cudf.Series(y_val_pd.astype(np.float32).values)
-    y_test = cudf.Series(y_test_pd.astype(np.float32).values)
+    y_train = cudf.from_pandas(y_train_pd.astype(np.float32))
+    y_val = cudf.from_pandas(y_val_pd.astype(np.float32))
+    y_test = cudf.from_pandas(y_test_pd.astype(np.float32))
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
@@ -364,11 +371,14 @@ def fit_single_elastic_net(
     val_pred = model.predict(X_val_scaled)
     test_pred = model.predict(X_test_scaled)
 
-    val_rmse = float(cp.sqrt(mean_squared_error(y_val_gpu, val_pred)).get())
-    test_rmse = float(cp.sqrt(mean_squared_error(y_test_gpu, test_pred)).get())
+    val_mse = mean_squared_error(y_val_gpu, val_pred)
+    test_mse = mean_squared_error(y_test_gpu, test_pred)
 
-    val_r2 = float(r2_score(y_val_gpu, val_pred).get())
-    test_r2 = float(r2_score(y_test_gpu, test_pred).get())
+    val_rmse = to_python_float(cp.sqrt(val_mse))
+    test_rmse = to_python_float(cp.sqrt(test_mse))
+
+    val_r2 = to_python_float(r2_score(y_val_gpu, val_pred))
+    test_r2 = to_python_float(r2_score(y_test_gpu, test_pred))
 
     return {
         "model": model,
@@ -382,6 +392,13 @@ def fit_single_elastic_net(
         "test_r2": test_r2,
     }
 
+def to_numpy_1d(x):
+    """Convert CuPy / NumPy / pandas-like objects to a NumPy array."""
+    if hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    elif hasattr(x, "get"):
+        x = x.get()
+    return np.asarray(x)
 
 def run_elastic_net_search(
     df: pd.DataFrame,
@@ -583,7 +600,7 @@ def run_elastic_net_search(
             random_state=random_state,
         )
 
-        coef = cp.asnumpy(result["model"].coef_)
+        coef = to_numpy_1d(result["model"].coef_)
         n_selected = int(np.sum(coef != 0))
 
         row = {
