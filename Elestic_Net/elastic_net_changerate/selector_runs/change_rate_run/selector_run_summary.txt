@@ -1,0 +1,5 @@
+run_name: change_rate_run
+target_col: homelessness_total_assessments_change_rate
+n_combos: 20
+output_root: /content/drive/MyDrive/net/elastic_net_changerate/selector_runs/change_rate_run
+note: No linear validation/test ranking is used. Final model selection should be done downstream with XGBoost.

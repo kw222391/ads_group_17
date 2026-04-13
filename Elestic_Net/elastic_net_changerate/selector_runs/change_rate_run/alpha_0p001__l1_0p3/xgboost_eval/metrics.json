@@ -1,0 +1,16 @@
+{
+  "selector_dir": "/content/drive/MyDrive/net/elastic_net_changerate/selector_runs/change_rate_run/alpha_0p001__l1_0p3",
+  "dataset_dir": "/content/drive/MyDrive/net/elastic_net_changerate/selector_runs/change_rate_run/alpha_0p001__l1_0p3/dataset",
+  "alpha": 0.001,
+  "l1_ratio": 0.3,
+  "n_final_features": 188,
+  "val_rmse": 0.7784984790729411,
+  "val_mae": 0.7262757886642508,
+  "val_r2": -6.441142122302331,
+  "test_rmse": 0.8934343852467626,
+  "test_mae": 0.8713557097162368,
+  "test_r2": -17.96154945897504,
+  "n_train_rows": 11641,
+  "n_val_rows": 1451,
+  "n_test_rows": 1466
+}
