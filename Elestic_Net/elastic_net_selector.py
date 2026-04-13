@@ -58,8 +58,8 @@ def require_rapids() -> None:
 
 def to_gpu_train(X_train_pd: pd.DataFrame, y_train_pd: pd.Series):
     require_rapids()
-    X_train = cudf.DataFrame.from_pandas(X_train_pd.astype(np.float32))
-    y_train = cudf.Series(y_train_pd.astype(np.float32).values)
+    X_train = cudf.from_pandas(X_train_pd.astype(np.float32))
+    y_train = cudf.from_pandas(y_train_pd.astype(np.float32))
     return X_train, y_train
 
 
@@ -396,12 +396,10 @@ def main() -> None:
     }
     save_json(summary, parent_run_dir / "selector_run_summary.json")
     (parent_run_dir / "selector_run_summary.txt").write_text(
-        "
-".join(f"{k}: {v}" for k, v in summary.items()), encoding="utf-8"
+        "\n".join(f"{k}: {v}" for k, v in summary.items()), encoding="utf-8"
     )
 
-    print("
-===== ELASTIC NET FEATURE SELECTION COMPLETE =====")
+    print("\n===== ELASTIC NET FEATURE SELECTION COMPLETE =====")
     print(f"Saved {len(results_rows)} selector combos under: {parent_run_dir}")
     print("No selector-level linear best is chosen here; downstream XGBoost should decide the final best combo.")
 
