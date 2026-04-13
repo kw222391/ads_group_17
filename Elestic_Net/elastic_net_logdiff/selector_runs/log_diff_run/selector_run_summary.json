@@ -1,0 +1,7 @@
+{
+  "run_name": "log_diff_run",
+  "target_col": "homelessness_total_assessments_log_diff",
+  "n_combos": 20,
+  "output_root": "/mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_logdiff/selector_runs/log_diff_run",
+  "note": "No linear validation/test ranking is used. Final model selection should be done downstream with XGBoost."
+}

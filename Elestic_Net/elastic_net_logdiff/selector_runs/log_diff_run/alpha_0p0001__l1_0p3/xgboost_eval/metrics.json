@@ -1,0 +1,16 @@
+{
+  "selector_dir": "/mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_logdiff/selector_runs/log_diff_run/alpha_0p0001__l1_0p3",
+  "dataset_dir": "/mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_logdiff/selector_runs/log_diff_run/alpha_0p0001__l1_0p3/dataset",
+  "alpha": 0.0001,
+  "l1_ratio": 0.3,
+  "n_final_features": 295,
+  "val_rmse": 0.5562680541974102,
+  "val_mae": 0.5171462911249212,
+  "val_r2": -4.8299913889618065,
+  "test_rmse": 0.5706067968964469,
+  "test_mae": 0.5390299196360144,
+  "test_r2": -8.065424626306042,
+  "n_train_rows": 11654,
+  "n_val_rows": 1454,
+  "n_test_rows": 1467
+}
