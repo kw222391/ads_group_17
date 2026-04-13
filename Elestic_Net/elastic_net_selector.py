@@ -396,12 +396,10 @@ def main() -> None:
     }
     save_json(summary, parent_run_dir / "selector_run_summary.json")
     (parent_run_dir / "selector_run_summary.txt").write_text(
-        "
-".join(f"{k}: {v}" for k, v in summary.items()), encoding="utf-8"
+        "\n".join(f"{k}: {v}" for k, v in summary.items()), encoding="utf-8"
     )
 
-    print("
-===== ELASTIC NET FEATURE SELECTION COMPLETE =====")
+    print("\n===== ELASTIC NET FEATURE SELECTION COMPLETE =====")
     print(f"Saved {len(results_rows)} selector combos under: {parent_run_dir}")
     print("No selector-level linear best is chosen here; downstream XGBoost should decide the final best combo.")
 
