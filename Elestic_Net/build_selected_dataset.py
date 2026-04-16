@@ -38,6 +38,7 @@ def build_dataset_for_manifest(
     train_mask, val_mask, test_mask = make_time_split_masks(
         df=df,
         date_col=manifest["date_col"],
+        train_start=manifest.get("train_start"),
         train_end=manifest["train_end"],
         val_end=manifest["val_end"],
     )
@@ -106,6 +107,7 @@ def build_dataset_for_manifest(
         "raw_data_path": str(Path(raw_data_path).resolve()),
         "target_col": target_col,
         "date_col": manifest["date_col"],
+        "train_start": manifest.get("train_start"),
         "train_end": manifest["train_end"],
         "val_end": manifest["val_end"],
         "alpha": manifest["alpha"],
@@ -135,6 +137,7 @@ def build_dataset_for_manifest(
         "dataset_dir": str(dataset_dir.resolve()),
         "alpha": manifest["alpha"],
         "l1_ratio": manifest["l1_ratio"],
+        "train_start": manifest.get("train_start"),
         "n_final_features": len(final_feature_cols),
         "n_train_rows": len(train_df),
         "n_val_rows": len(val_df),

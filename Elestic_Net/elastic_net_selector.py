@@ -108,6 +108,7 @@ def prepare_data(
     df: pd.DataFrame,
     target_col: str,
     date_col: str,
+    train_start: str | None,
     train_end: str,
     val_end: str,
     exclude_cols: list[str],
@@ -148,7 +149,11 @@ def prepare_data(
     y_all = df[target_col].copy()
 
     train_mask, val_mask, test_mask = make_time_split_masks(
-        df=df, date_col=date_col, train_end=train_end, val_end=val_end
+        df=df,
+        date_col=date_col,
+        train_start=train_start,
+        train_end=train_end,
+        val_end=val_end,
     )
 
     X_train_pd = X_all.loc[train_mask].copy()
@@ -216,6 +221,7 @@ def prepare_data(
         "df": df,
         "target_col": target_col,
         "date_col": date_col,
+        "train_start": train_start,
         "train_end": train_end,
         "val_end": val_end,
         "exclude_cols": exclude_cols,
@@ -245,6 +251,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input_path", type=str, required=True, help="Path to the raw data (.csv, .csv.gz, or .parquet)")
     parser.add_argument("--target_col", type=str, required=True, help="Target column name")
     parser.add_argument("--date_col", type=str, default="date", help="Date column name")
+    parser.add_argument("--train_start", type=str, default=None, help="Optional train start boundary: train uses train_start <= date < train_end")
     parser.add_argument("--train_end", type=str, default="2023-09-01")
     parser.add_argument("--val_end", type=str, default="2024-09-30")
     parser.add_argument("--exclude_cols", type=str, nargs="*", default=DEFAULT_EXCLUDE_COLS)
@@ -285,6 +292,7 @@ def main() -> None:
         df=df,
         target_col=args.target_col,
         date_col=args.date_col,
+        train_start=args.train_start,
         train_end=args.train_end,
         val_end=args.val_end,
         exclude_cols=args.exclude_cols,
@@ -341,6 +349,7 @@ def main() -> None:
                 "combo_name": combo_dir.name,
                 "target_col": args.target_col,
                 "date_col": args.date_col,
+                "train_start": args.train_start,
                 "train_end": args.train_end,
                 "val_end": args.val_end,
                 "exclude_cols": list(args.exclude_cols),
@@ -367,6 +376,9 @@ def main() -> None:
             row = {
                 "run_name": run_name,
                 "combo_name": combo_dir.name,
+                "train_start": args.train_start,
+                "train_end": args.train_end,
+                "val_end": args.val_end,
                 "alpha": alpha,
                 "l1_ratio": l1_ratio,
                 "n_selected_candidate_features": fit_result["n_selected_features"],
@@ -390,6 +402,9 @@ def main() -> None:
     summary = {
         "run_name": run_name,
         "target_col": args.target_col,
+        "train_start": args.train_start,
+        "train_end": args.train_end,
+        "val_end": args.val_end,
         "n_combos": int(len(results_rows)),
         "output_root": str(parent_run_dir.resolve()),
         "note": "No linear validation/test ranking is used. Final model selection should be done downstream with XGBoost.",

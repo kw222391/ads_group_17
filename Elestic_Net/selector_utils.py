@@ -158,14 +158,23 @@ def validate_model_inputs(
 def make_time_split_masks(
     df: pd.DataFrame,
     date_col: str = "date",
+    train_start: str | None = None,
     train_end: str = "2023-09-01",
     val_end: str = "2024-09-30",
 ):
     date_series = pd.to_datetime(df[date_col], errors="coerce")
+    train_start_ts = pd.Timestamp(train_start) if train_start is not None else None
     train_end_ts = pd.Timestamp(train_end)
     val_end_ts = pd.Timestamp(val_end)
 
+    if train_start_ts is not None and train_start_ts >= train_end_ts:
+        raise ValueError("train_start must be earlier than train_end.")
+    if train_end_ts > val_end_ts:
+        raise ValueError("train_end must be earlier than or equal to val_end.")
+
     train_mask = date_series < train_end_ts
+    if train_start_ts is not None:
+        train_mask &= date_series >= train_start_ts
     val_mask = (date_series >= train_end_ts) & (date_series <= val_end_ts)
     test_mask = date_series > val_end_ts
     return train_mask, val_mask, test_mask

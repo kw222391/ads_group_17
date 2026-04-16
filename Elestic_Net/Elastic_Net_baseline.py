@@ -141,21 +141,30 @@ def validate_model_inputs(
 def make_time_split_masks(
     df: pd.DataFrame,
     date_col: str = "date",
+    train_start: str | None = None,
     train_end: str = "2023-09-01",
     val_end: str = "2024-09-30",
 ):
     """
     Split rule:
-      train: date < train_end
+      train: train_start <= date < train_end if train_start is set, otherwise date < train_end
       val  : train_end <= date <= val_end
       test : date > val_end
     """
     date_series = pd.to_datetime(df[date_col], errors="coerce")
 
+    train_start_ts = pd.Timestamp(train_start) if train_start is not None else None
     train_end_ts = pd.Timestamp(train_end)
     val_end_ts = pd.Timestamp(val_end)
 
+    if train_start_ts is not None and train_start_ts >= train_end_ts:
+        raise ValueError("train_start must be earlier than train_end.")
+    if train_end_ts > val_end_ts:
+        raise ValueError("train_end must be earlier than or equal to val_end.")
+
     train_mask = date_series < train_end_ts
+    if train_start_ts is not None:
+        train_mask &= date_series >= train_start_ts
     val_mask = (date_series >= train_end_ts) & (date_series <= val_end_ts)
     test_mask = date_series > val_end_ts
 
@@ -404,6 +413,7 @@ def run_elastic_net_search(
     df: pd.DataFrame,
     target_col: str,
     date_col: str = "date",
+    train_start: str | None = None,
     train_end: str = "2023-09-01",
     val_end: str = "2024-09-30",
     exclude_cols=None,
@@ -493,6 +503,7 @@ def run_elastic_net_search(
     train_mask, val_mask, test_mask = make_time_split_masks(
         df=df,
         date_col=date_col,
+        train_start=train_start,
         train_end=train_end,
         val_end=val_end,
     )
@@ -711,6 +722,12 @@ def parse_args():
 
     # ===== 时间切分 =====
     parser.add_argument(
+        "--train_start",
+        type=str,
+        default=None,
+        help="Optional train start boundary: train uses train_start <= date < train_end"
+    )
+    parser.add_argument(
         "--train_end",
         type=str,
         default="2023-09-01",
@@ -842,6 +859,7 @@ def main():
         df=df,
         target_col=args.target_col,
         date_col=args.date_col,
+        train_start=args.train_start,
         train_end=args.train_end,
         val_end=args.val_end,
         exclude_cols=args.exclude_cols,
