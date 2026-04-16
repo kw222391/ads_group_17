@@ -1,0 +1,8 @@
+run_name: post2018_change_rate_run
+target_col: homelessness_total_assessments_change_rate
+train_start: 2019-01-01
+train_end: 2023-09-01
+val_end: 2024-09-30
+n_combos: 30
+output_root: /mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_changerate/selector_runs/post2018_change_rate_run
+note: No linear validation/test ranking is used. Final model selection should be done downstream with XGBoost.

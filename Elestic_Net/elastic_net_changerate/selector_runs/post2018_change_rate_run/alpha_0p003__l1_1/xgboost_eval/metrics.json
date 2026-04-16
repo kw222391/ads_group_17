@@ -1,0 +1,16 @@
+{
+  "selector_dir": "/mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_changerate/selector_runs/post2018_change_rate_run/alpha_0p003__l1_1",
+  "dataset_dir": "/mnt/d/UOB/ads_group_17/ads_group_17/Elestic_Net/elastic_net_changerate/selector_runs/post2018_change_rate_run/alpha_0p003__l1_1/dataset",
+  "alpha": 0.003,
+  "l1_ratio": 1.0,
+  "n_final_features": 70,
+  "val_rmse": 0.46044141116213355,
+  "val_mae": 0.4015108219477468,
+  "val_r2": -1.6029918906384495,
+  "test_rmse": 0.4338335846991159,
+  "test_mae": 0.398853912251787,
+  "test_r2": -3.470898762482779,
+  "n_train_rows": 3606,
+  "n_val_rows": 1451,
+  "n_test_rows": 1466
+}
