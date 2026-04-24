@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, root_mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
@@ -77,54 +77,58 @@ df["hpi_yoy"] = df.groupby("lad_code")["hpi"].pct_change(4)
 
 df = df.dropna().copy()
 
-# train = df[df["date"] < "2023-01-01"]
-# test = df[df["date"] >= "2023-01-01"]
+train = df[df["date"] < "2023-01-01"]
+test = df[df["date"] >= "2023-01-01"]
 
-# y_true = test["homelessness_total_assessments"]
+y_true = test["homelessness_total_assessments"]
 
-# features = [
-#     #homeless lag
-#     "lag1", "lag2", "lag3", "lag4",
-#     "quarter_num", "covid",
-#     #cc
-#     "claimant_rate",
-#     "claimant_rate_lag1",
-#     "claimant_rate_qoq",
-#     "claimant_rate_yoy",
-#     #cpi
-#     "cpi", 
-#     "cpi_lag1", 
-#     "cpi_qoq", 
-#     "cpi_yoy",
-#     #hpi
-#     "hpi",
-#     "hpi_lag1",
-#     "hpi_qoq",
-#     "hpi_yoy"
-# ]
-
-
-# rf = RandomForestRegressor(
-#     n_estimators=200,
-#     max_depth=10,
-#     random_state=42,
-#     n_jobs=-1
-# )
-
-# rf.fit(train[features], train["target_log"])
-
-# y_pred_log = rf.predict(test[features])
-# y_pred = np.expm1(y_pred_log)
-
-# print("RF MAE:", mean_absolute_error(y_true, y_pred))
-# print("RF RMSE:", mean_squared_error(y_true, y_pred, squared=False))
-# print("RF R2:", r2_score(y_true, y_pred))
-
-# importances = pd.Series(rf.feature_importances_, index=features)
-# print(importances.sort_values(ascending=False))
+features = [
+    #homeless lag
+    "lag1", "lag2", "lag3", "lag4",
+    "quarter_num", "covid",
+    #cc
+    "claimant_rate",
+    "claimant_rate_lag1",
+    "claimant_rate_qoq",
+    "claimant_rate_yoy",
+    #cpi
+    "cpi", 
+    "cpi_lag1", 
+    "cpi_qoq", 
+    "cpi_yoy",
+    #hpi
+    "hpi",
+    "hpi_lag1",
+    "hpi_qoq",
+    "hpi_yoy"
+]
 
 
-#####linear regression
+rf = RandomForestRegressor(
+    n_estimators=200,
+    max_depth=10,
+    random_state=42,
+    n_jobs=-1
+)
+
+rf.fit(train[features], train["target_log"])
+
+y_pred_log = rf.predict(test[features])
+y_pred = np.expm1(y_pred_log)
+
+print("-------------------------")
+print("RANDOM FOREST")
+print("-------------------------")
+
+print("RF MAE:", mean_absolute_error(y_true, y_pred))
+print("RF RMSE:", root_mean_squared_error(y_true, y_pred))
+print("RF R2:", r2_score(y_true, y_pred))
+
+importances = pd.Series(rf.feature_importances_, index=features)
+print(importances.sort_values(ascending=False))
+
+
+####linear regression
 df["log_lag1"] = np.log1p(df["lag1"])
 
 df["hpi_yoy"] = df["hpi_yoy"].clip(-1, 1)
@@ -161,8 +165,13 @@ y_pred_log = lr.predict(X_test_scaled)
 y_pred = np.expm1(y_pred_log)
 y_true = np.expm1(y_test)
 
+
+print("-------------------------")
+print("LINEAR REGRESSION")
+print("-------------------------")
+
 print("Reg MAE:", mean_absolute_error(y_true, y_pred))
-print("Reg RMSE:", mean_squared_error(y_true, y_pred, squared=False))
+print("Reg RMSE:", root_mean_squared_error(y_true, y_pred))
 print("Reg R2:", r2_score(y_true, y_pred))
 
 coeffs = pd.Series(lr.coef_, index=features_reg)
