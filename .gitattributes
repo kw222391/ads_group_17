@@ -1,2 +1,6 @@
 *.csv filter=lfs diff=lfs merge=lfs -text
 *.csv.gz filter=lfs diff=lfs merge=lfs -text
+
+# Keep RF model input CSVs as normal files, not Git LFS
+RF/*.csv -filter -diff -merge -text
+RF/**/*.csv -filter -diff -merge -text
