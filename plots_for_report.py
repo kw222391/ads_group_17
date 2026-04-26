@@ -137,7 +137,7 @@ plt.show()
 import pandas as pd
 import matplotlib.pyplot as plt
 
-file_path = r"D:\UOB\ads_group_17\ads_group_17\data\homelessness_integrated_09_25_zhou.csv"
+file_path = r"D:\UOB\ads_group_17\ads_group_17\homeless_lad_2009_2025_final_junxi (2).csv"
 output_path = r"D:\UOB\ads_group_17\ads_group_17\data_new\homelessness_total_assessments_england_quarterly.png"
 
 policy_year = 2018
@@ -192,7 +192,14 @@ quarterly = quarterly.sort_values(["year", "quarter_num"]).reset_index(drop=True
 quarterly["x"] = range(len(quarterly))
 
 before_2018 = quarterly[quarterly["year"] < policy_year]
-after_2018 = quarterly[quarterly["year"] >= policy_year]
+quarterly["x"] = range(len(quarterly))
+
+before_2018 = quarterly[quarterly["year"] < policy_year]
+
+after_2018 = quarterly[
+    (quarterly["year"] >= policy_year) &
+    ~((quarterly["year"] == policy_year) & (quarterly["quarter_num"] == 1))
+].copy()
 
 plt.figure(figsize=(16, 7))
 

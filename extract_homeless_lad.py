@@ -25,7 +25,6 @@ VALUE_COLUMNS = [
 
 LAD_RE = re.compile(r"^E0[6-9]\d{6}$")
 YEAR_RE = re.compile(r"\b(20\d{2})\b")
-YYYYMM_RE = re.compile(r"(20\d{2})(0[1-9]|1[0-2])")
 
 QUARTER_PATTERNS = [
     (
@@ -173,14 +172,6 @@ def same_value(a, b):
 def parse_period(*texts):
     text = " ".join(str(t) for t in texts if t is not None)
     text = text.replace("_", " ")
-
-    # Supports file/sheet names like 202006, 202106, 202206.
-    ym = YYYYMM_RE.search(text)
-    if ym:
-        y = int(ym.group(1))
-        m = int(ym.group(2))
-        return y, f"Q{((m - 1) // 3) + 1}"
-
     text = text.replace(" - ", " to ").replace("-", " to ")
 
     year_match = YEAR_RE.search(text)
@@ -220,9 +211,6 @@ def parse_period(*texts):
 
     return year, quarter
 
-def excel_engine(path):
-    return "odf" if str(path).lower().endswith(".ods") else None
-
 
 def read_sheet(path, sheet_name):
     return pd.read_excel(
@@ -230,12 +218,12 @@ def read_sheet(path, sheet_name):
         sheet_name=sheet_name,
         header=None,
         dtype=object,
-        engine=excel_engine(path),
     )
 
 
 def get_sheets(path):
-    return pd.ExcelFile(path, engine=excel_engine(path)).sheet_names
+    return pd.ExcelFile(path).sheet_names
+
 
 def combined_headers(df, start_row=0, end_row=8):
     headers = {}
@@ -446,25 +434,13 @@ def make_record(
 
 
 def find_old_total_col(df, header_row=None, code_col=None, name_col=None):
-    # 1) Strongest signal: P1E total-decision code in the upper part of the sheet.
-    # Older wide P1E sheets use e16w for the all-ethnic-groups total. The compact
-    # 2013/2014 layout uses e16g for the same total; e16a is only the White subtotal.
+    # 1) Strongest signal: P1E code e16w / e16 in any of the upper part of the sheet.
     scan_rows = min(df.shape[0], 150)
-    code_hits = {"e16w": [], "e16g": [], "e16": []}
-
     for r in range(scan_rows):
         for c in range(df.shape[1]):
             ct = compact_text(df.iat[r, c])
-            if ct == "e16w" or ct.startswith("e16w"):
-                code_hits["e16w"].append(c)
-            elif ct == "e16g":
-                code_hits["e16g"].append(c)
-            elif ct == "e16":
-                code_hits["e16"].append(c)
-
-    for code in ["e16w", "e16g", "e16"]:
-        if code_hits[code]:
-            return code_hits[code][0]
+            if ct in {"e16w", "e16"} or ct.startswith("e16w"):
+                return c
 
     # 2) Header text signals around the table.
     if header_row is None:
@@ -479,13 +455,10 @@ def find_old_total_col(df, header_row=None, code_col=None, name_col=None):
     for start, end in windows:
         headers = combined_headers(df, start, end)
 
-        for target in ["e16w", "e16g", "e16"]:
-            for c, h in headers.items():
-                hc = compact_text(h)
-                if target == "e16w" and "e16w" in hc:
-                    return c
-                if target in {"e16g", "e16"} and hc == target:
-                    return c
+        for c, h in headers.items():
+            hc = compact_text(h)
+            if "e16w" in hc or hc == "e16":
+                return c
 
         preferred = [
             ["total decisions"],
@@ -611,7 +584,7 @@ def extract_14_18(path, sheets):
 
         df = read_sheet(path, sheet)
 
-        top_text = " ".join(norm_text(x) for x in df.head(12).to_numpy().ravel())
+        top_text = " ".join(norm_text(x) for x in df.head(10).to_numpy().ravel())
         year, quarter = parse_period(path.stem, sheet, top_text)
 
         if not year or not quarter:
@@ -668,13 +641,9 @@ def extract_14_18(path, sheets):
 
 
 def looks_like_18_25_a1(path, sheet, df):
-    top_text = " ".join(norm_text(x) for x in df.head(12).to_numpy().ravel())
+    top_text = " ".join(norm_text(x) for x in df.head(10).to_numpy().ravel())
     sheet_text = norm_text(sheet)
     file_text = norm_text(path.name)
-
-    # Detailed LA ODS files for the missing Q2s, for example 202006/202106/202206.
-    if "detailed" in file_text and "la" in file_text:
-        return True
 
     if "table a1" in top_text or "table a1" in sheet_text:
         return True
@@ -685,6 +654,7 @@ def looks_like_18_25_a1(path, sheet, df):
 
     return False
 
+
 def extract_18_25(path, sheets):
     records = []
 
@@ -694,13 +664,13 @@ def extract_18_25(path, sheets):
         if not looks_like_18_25_a1(path, sheet, df):
             continue
 
-        top_text = " ".join(norm_text(x) for x in df.head(12).to_numpy().ravel())
+        top_text = " ".join(norm_text(x) for x in df.head(10).to_numpy().ravel())
         year, quarter = parse_period(path.stem, sheet, top_text)
 
         if not year or not quarter:
             continue
 
-        headers = combined_headers(df, 0, 12)
+        headers = combined_headers(df, 0, 9)
 
         code_col = find_lad_code_col(df)
         if code_col is None:
@@ -713,7 +683,6 @@ def extract_18_25(path, sheets):
             or find_col(headers, ["total", "initial", "assessment"])
             or find_col(headers, ["total number", "households", "assessed"])
             or find_col(headers, ["total", "households", "assessed"])
-            or find_col(headers, ["total", "assessments"])
         )
 
         relief_col = None
@@ -736,7 +705,7 @@ def extract_18_25(path, sheets):
 
         for c, h in headers.items():
             if (
-                ("assessed as homeless" in h or "homeless per" in h or "households assessed as homeless" in h)
+                ("assessed as homeless" in h or "homeless per" in h)
                 and "per" in h
                 and ("000" in h or "1,000" in h or "1000" in h)
             ):
@@ -779,10 +748,6 @@ def choose_extractors(path, sheets):
     if "18-25" in name or "homelessness 18" in name:
         extractors.append(("18_25", extract_18_25))
 
-    # Detailed LA ODS files for 2020Q2 / 2021Q2 / 2022Q2.
-    if "detailed" in name and "la" in name:
-        extractors.append(("18_25", extract_18_25))
-
     if any(norm_text(s).endswith("_qtr") for s in sheets):
         extractors.append(("14_18", extract_14_18))
 
@@ -798,6 +763,7 @@ def choose_extractors(path, sheets):
             seen.add(label)
 
     return final
+
 
 def build_name_to_lad(records):
     mapping = {}
@@ -917,21 +883,8 @@ def collect_records(data_dir):
     data_dir = Path(data_dir)
 
     excel_files = []
-
     for pattern in ["*.xls", "*.xlsx", "*.xlsm"]:
         excel_files.extend(data_dir.rglob(pattern))
-
-    # Read only the Detailed LA ODS files needed to fill missing Q2s.
-    # This avoids scanning unrelated / very large ODS files in the data folder.
-    target_ods_periods = {"202006", "202106", "202206"}
-    for path in data_dir.rglob("*.ods"):
-        lower = path.name.lower()
-        if (
-            "detailed" in lower
-            and "la" in lower
-            and any(period in lower for period in target_ods_periods)
-        ):
-            excel_files.append(path)
 
     excel_files = sorted(
         p for p in excel_files
@@ -951,7 +904,6 @@ def collect_records(data_dir):
                     "file": str(path),
                     "stage": "open_workbook",
                     "error": repr(e),
-                    "traceback": "",
                 }
             )
             continue
@@ -985,6 +937,7 @@ def collect_records(data_dir):
         )
 
     return all_records, failed, source_summary
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -1052,7 +1005,7 @@ def main():
         ],
     )
 
-    print(f"Excel/ODS files scanned: {len(source_summary):,}")
+    print(f"Excel files scanned: {len(source_summary):,}")
     print(f"Raw records extracted: {len(records):,}")
     print(f"Merged LAD-quarter rows: {len(merged):,}")
     print(f"Conflicts written: {len(conflicts):,}")
