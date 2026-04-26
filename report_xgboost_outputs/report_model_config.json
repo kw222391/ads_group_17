@@ -1,0 +1,41 @@
+{
+  "target": "homelessness_total_assessments",
+  "total_cpi_feature_used": "cpi_00_all_items",
+  "cpi_categories_used": false,
+  "model_split": {
+    "train_end": "2023Q4",
+    "validation": "2024Q1-2024Q4",
+    "test": "2025Q1-2025Q4"
+  },
+  "xgb_params": {
+    "objective": "reg:squarederror",
+    "eval_metric": "rmse",
+    "n_estimators": 1600,
+    "learning_rate": 0.025,
+    "max_depth": 3,
+    "min_child_weight": 10,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "reg_alpha": 0.05,
+    "reg_lambda": 3.0,
+    "tree_method": "hist",
+    "random_state": 42,
+    "n_jobs": 4,
+    "early_stopping_rounds": 100
+  },
+  "blend_summary": {
+    "w_xgb_valid_MAE": 0.85,
+    "valid_MAE_at_w": 31.778754482408097,
+    "w_xgb_valid_RMSE": 0.67,
+    "valid_RMSE_at_w": 55.35213481608482,
+    "w_xgb_valid_MAE_constrained_min_0_50": 0.8500000000000001,
+    "valid_MAE_constrained_at_w": 31.778754482408104,
+    "w_lag1_in_main_blend": 0.15000000000000002
+  },
+  "excluded_direct_lag1_target_features": [
+    "homelessness_total_assessments_lag1q",
+    "log1p_homelessness_total_assessments_lag1q",
+    "computed_homelessness_rate_per_1000_lag1q",
+    "log1p_computed_homelessness_rate_per_1000_lag1q"
+  ]
+}
