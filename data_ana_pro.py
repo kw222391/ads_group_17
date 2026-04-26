@@ -1,5 +1,4 @@
 
-from pathlib import Path
 import os
 import csv
 import warnings
@@ -16,29 +15,9 @@ except ImportError:
 
 warnings.filterwarnings("ignore")
 
-# =============================================================================
-# Cost of living + homelessness analysis
-# -----------------------------------------------------------------------------
-# Put this script in the same folder as:
-#   1) monthly_lad_panel_2000_2025_with_homelessness_2000_2025.csv
-#      or all_data_for_ana.csv
-#   2) homelessness_total_assessments_quarterly_total_and_change.csv
-#
-# Important choices:
-#   - CPI is restricted to CPI total only: cpi_00_all_items.
-#   - All other CPI category columns are intentionally ignored.
-#   - Homelessness is split around the Homelessness Reduction Act reporting break:
-#       pre_2018_HRA  = quarters before 2018Q2
-#       post_2018_HRA = quarters from 2018Q2 onwards
-#   - Figures are displayed with plt.show(), so they should open in PyCharm.
-# =============================================================================
-from pathlib import Path
 
 from pathlib import Path
 
-# =========================================================
-# FILE PATHS
-# =========================================================
 
 BASE_DIR = Path(r"D:\UOB\ads_group_17\ads_group_17\data_new")
 
@@ -58,21 +37,15 @@ CPI_COL = "cpi_00_all_items"
 HOMELESS_COL = "homelessness_total_assessments"
 HRA_START = pd.Period("2018Q2", freq="Q")
 
-# Lag choices for homelessness relationship.
 QUARTER_LAGS = [0, 1, 2, 4, 8]
 
-# Plot / output switches.
 SHOW_FIGURES = os.getenv("SHOW_FIGURES", "1") == "1"
 SAVE_FIGURES = os.getenv("SAVE_FIGURES", "1") == "1"
 SAVE_TABLES = os.getenv("SAVE_TABLES", "1") == "1"
 
-# LAD fixed-effect models with many area dummies can be slow in PyCharm.
-# They are optional. Set RUN_LAD_FE_MODELS=1 in your environment if you want them.
 RUN_ENGLAND_MODELS = os.getenv("RUN_ENGLAND_MODELS", "1") == "1"
 RUN_LAD_FE_MODELS = os.getenv("RUN_LAD_FE_MODELS", "0") == "1"
 
-# These are the non-CPI living-cost / macro / local context features in the data.
-# CPI total is added separately as CPI_COL. All other CPI columns are excluded.
 BASE_COLS = ["year", "month", "lad_code", "lad_name"]
 
 LIVING_COST_RAW_FEATURES = [
@@ -106,11 +79,6 @@ HOMELESS_FEATURES = [
 ]
 
 REQUIRED_USECOLS = BASE_COLS + LIVING_COST_RAW_FEATURES + HOMELESS_FEATURES + [CPI_COL]
-
-
-# -----------------------------------------------------------------------------
-# General utilities
-# -----------------------------------------------------------------------------
 
 def print_section(title):
     print("\n" + "=" * 100)
@@ -205,10 +173,7 @@ def add_lags_by_group(df, group_col, sort_col, value_cols, lags, suffix="lag"):
 
 
 def add_calendar_quarter_lags(df, group_col, quarter_col, value_cols, lags):
-    """
-    Adds true calendar-quarter lags. This is safer than row shift when a LAD has
-    missing quarters.
-    """
+
     out = df.copy()
     base_cols = [group_col, quarter_col] + value_cols
     base = df[base_cols].copy()
@@ -288,11 +253,6 @@ def compact_label(name):
     }
     return replacements.get(name, name)
 
-
-# -----------------------------------------------------------------------------
-# Reading and preparing monthly data
-# -----------------------------------------------------------------------------
-
 def read_monthly_panel():
     print_section("Reading monthly panel")
     monthly_file = choose_monthly_file()
@@ -356,27 +316,8 @@ def build_feature_coverage(monthly):
     return out
 
 
-# -----------------------------------------------------------------------------
-# England-level living-cost trend construction
-# -----------------------------------------------------------------------------
-
 def aggregate_england_living_cost(monthly):
-    """
-    Builds a monthly England-level living-cost table.
 
-    Some variables are truly national and repeated for every LAD, e.g. CPI, GBP,
-    FTSE, Bank Rate, Brent oil. We take the first non-null value by month.
-
-    Some variables are local LAD variables, e.g. rent, income, population and
-    unemployment. We aggregate LAD rows to England:
-      - counts / volumes / migration / population: sum
-      - price and income variables: population-weighted mean when possible,
-        otherwise simple mean
-      - rates per 1,000: derived after aggregation
-
-    Official England aggregate rows are used for house price variables when
-    available, because those are already England aggregates in the data.
-    """
     print_section("Building England-level living-cost trend")
 
     lad = monthly[monthly["is_lad"]].copy()
@@ -395,7 +336,6 @@ def aggregate_england_living_cost(monthly):
     agg["internal_net_migration"] = grouped["internal_net_migration"].sum(min_count=1).reindex(agg["date"]).values if "internal_net_migration" in lad else np.nan
     agg["international_net_migration"] = grouped["international_net_migration"].sum(min_count=1).reindex(agg["date"]).values if "international_net_migration" in lad else np.nan
 
-    # Weighted means for local prices/income/indexes.
     weighted_mean_cols = [
         "average_house_price",
         "house_price_index",
@@ -411,7 +351,7 @@ def aggregate_england_living_cost(monthly):
             vals = pd.DataFrame(vals)
             agg = agg.merge(vals, on="date", how="left")
 
-    # Official England aggregate row for house-price variables.
+
     england_house_cols = [
         "average_house_price",
         "average_house_price_monthly_change",
@@ -443,7 +383,6 @@ def aggregate_england_living_cost(monthly):
     out["quarter_date"] = out["quarter"].dt.to_timestamp(how="start")
     out["policy_period"] = period_label(out["quarter"])
 
-    # Canonical feature names used downstream.
     out["average_house_price"] = out.get("average_house_price_england_official", pd.Series(index=out.index)).combine_first(
         out.get("average_house_price_lad_weighted_mean", pd.Series(index=out.index))
     )
@@ -461,7 +400,6 @@ def aggregate_england_living_cost(monthly):
     out["internal_net_migration_per_1000"] = out["internal_net_migration"] / out["population"] * 1000
     out["international_net_migration_per_1000"] = out["international_net_migration"] / out["population"] * 1000
 
-    # Inflation-adjusted and affordability-type indicators.
     out["real_income"] = out["income"] / out["cpi_total"] * 100
     out["real_house_price"] = out["average_house_price"] / out["cpi_total"] * 100
     out["real_private_rent"] = out["average_private_rental_price"] / out["cpi_total"] * 100
@@ -470,7 +408,7 @@ def aggregate_england_living_cost(monthly):
     out["rent_to_cpi_ratio"] = out["private_rental_price_index"] / out["cpi_total"]
     out["oil_to_cpi_ratio"] = out["brent_oil_price"] / out["cpi_total"]
 
-    # Monthly and annual changes for trend analysis.
+    # Monthly and annual changes
     change_cols = [
         "cpi_total",
         "average_house_price",
@@ -504,7 +442,7 @@ def aggregate_england_living_cost(monthly):
 
     out = clean_inf(out)
 
-    # Composite pressure index: a higher number means higher living-cost pressure.
+    # pressure index
     level_components = {
         "cpi_total": "positive",
         "average_house_price": "positive",
@@ -545,7 +483,7 @@ def aggregate_england_living_cost(monthly):
     out["living_cost_growth_pressure_index"] = growth_z.mean(axis=1, skipna=True)
     out["n_living_cost_growth_components"] = growth_z.notna().sum(axis=1)
 
-    # CPI total lags, because CPI is still the requested CPI variable.
+    # CPI total lags
     for lag in QUARTER_LAGS:
         # monthly lag equivalent for 1 quarter = 3 months.
         ml = lag * 3
@@ -601,10 +539,6 @@ def quarterly_england_living_cost(eng_monthly):
     return q
 
 
-# -----------------------------------------------------------------------------
-# LAD-level living-cost feature engineering
-# -----------------------------------------------------------------------------
-
 def build_lad_living_cost_panel(monthly):
     print_section("Building LAD-level living-cost panel")
     lad = monthly[monthly["is_lad"]].copy().sort_values(["lad_code", "date"]).reset_index(drop=True)
@@ -637,11 +571,9 @@ def build_lad_living_cost_panel(monthly):
             lad[f"{c}_yoy_pct"] = pct_change_by_group(lad, "lad_code", c, 12)
             lad[f"{c}_yoy_diff"] = diff_by_group(lad, "lad_code", c, 12)
 
-    # CPI / national variables are the same for all LADs, so use ordinary time changes.
+    # CPI
     for c in ["cpi_total", "gbp_index", "ftse_100", "uk_bank_rate", "brent_oil_price"]:
         if c in lad.columns:
-            # The rows are repeated by LAD, so compute using one national monthly series
-            # and merge back.
             tmp = lad[["date", c]].drop_duplicates("date").sort_values("date").copy()
             tmp[f"{c}_yoy_pct"] = tmp[c].pct_change(12) * 100
             tmp[f"{c}_yoy_diff"] = tmp[c].diff(12)
@@ -653,7 +585,7 @@ def build_lad_living_cost_panel(monthly):
 
     lad = clean_inf(lad)
 
-    # Composite indexes at LAD level. The z-scores are computed over the LAD panel.
+    # Composite indexes at LAD level
     level_components = {
         "cpi_total": "positive",
         "average_house_price": "positive",
@@ -747,14 +679,8 @@ def quarterly_lad_living_cost(lad_monthly):
     return q
 
 
-# -----------------------------------------------------------------------------
-# Living-cost feature relationship analysis
-# -----------------------------------------------------------------------------
-
 def run_pca_from_corr(df, cols, min_non_missing=80):
-    """
-    PCA using standardized complete cases. No sklearn dependency.
-    """
+
     use_cols = [
         c for c in cols
         if c in df.columns and df[c].notna().sum() >= min_non_missing and df[c].nunique(dropna=True) > 1
@@ -848,7 +774,7 @@ def analyze_living_cost_feature_relationships(eng_monthly, lad_monthly):
         "living_cost_growth_pressure_index",
     ]
 
-    # England monthly correlations.
+    # England
     eng_level_corr = correlation_matrix(eng_monthly, level_features, method="pearson", min_non_missing=36)
     eng_yoy_corr = correlation_matrix(eng_monthly, yoy_features, method="pearson", min_non_missing=36)
     eng_level_top = top_correlation_pairs(eng_level_corr, top_n=50)
@@ -864,11 +790,10 @@ def analyze_living_cost_feature_relationships(eng_monthly, lad_monthly):
     print("\nTop England-level correlations among living-cost YoY / change features:")
     print(eng_yoy_top.head(15).to_string(index=False))
 
-    # LAD pooled and LAD within correlations.
+    # LAD pooled
     lad_level_corr = correlation_matrix(lad_monthly, level_features, method="pearson", min_non_missing=1000)
     lad_yoy_corr = correlation_matrix(lad_monthly, yoy_features, method="pearson", min_non_missing=1000)
 
-    # Within-LAD de-meaned correlations: this removes permanent cross-LAD differences.
     within_cols = [c for c in level_features if c in lad_monthly.columns and lad_monthly[c].notna().sum() >= 1000]
     within = lad_monthly[["lad_code"] + within_cols].copy()
     for c in within_cols:
@@ -882,7 +807,7 @@ def analyze_living_cost_feature_relationships(eng_monthly, lad_monthly):
     safe_to_csv(top_correlation_pairs(lad_yoy_corr, top_n=50), "14_lad_living_cost_top_yoy_correlation_pairs.csv")
     safe_to_csv(top_correlation_pairs(lad_within_corr, top_n=50), "15_lad_living_cost_top_within_lad_correlation_pairs.csv")
 
-    # PCA / first-principal-component trend. Use a compact set of cost-pressure components.
+    # PCA
     pca_cols = [
         "cpi_total_yoy_pct",
         "average_house_price_yoy_pct",
@@ -926,11 +851,6 @@ def corr_to_long(corr):
     tmp = corr.copy()
     tmp.index.name = "feature_1"
     return tmp.reset_index().melt(id_vars="feature_1", var_name="feature_2", value_name="corr")
-
-
-# -----------------------------------------------------------------------------
-# Homelessness and living-cost relationship
-# -----------------------------------------------------------------------------
 
 def read_quarterly_homelessness():
     print_section("Reading quarterly homelessness")
@@ -1159,9 +1079,6 @@ def run_lad_models(lad):
     return out
 
 
-# -----------------------------------------------------------------------------
-# Visualizations
-# -----------------------------------------------------------------------------
 
 def plot_living_cost_index(eng_monthly):
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -1449,10 +1366,6 @@ def make_plots(eng_monthly, relation_results, eng_merged, lad_merged, eng_corr, 
         plt.close("all")
 
 
-# -----------------------------------------------------------------------------
-# Descriptive trend summaries
-# -----------------------------------------------------------------------------
-
 def trend_start_end_summary(eng_monthly):
     print_section("Living-cost trend start/end summary")
     cols = [
@@ -1533,10 +1446,6 @@ def period_summary(eng_monthly):
     print(out.to_string(index=False))
     return out
 
-
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
