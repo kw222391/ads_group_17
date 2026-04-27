@@ -1,0 +1,96 @@
+{
+  "scenario": "lagged_only_no_same_quarter_exog_forecast",
+  "target": "homelessness_total_assessments",
+  "total_cpi_feature_used": "cpi_00_all_items",
+  "cpi_categories_used": false,
+  "model_split": {
+    "train_end": "2023Q4",
+    "validation": "2024Q1-2024Q4",
+    "test": "2025Q1-2025Q4"
+  },
+  "feature_selection": {
+    "drop_features_missing_above": 0.8,
+    "pairwise_corr_prune_threshold": 0.985,
+    "target_corr_min_abs": 0.005,
+    "top_k_features": null,
+    "min_auto_features": 50,
+    "max_auto_features": null,
+    "force_keep_lad_dummies": false
+  },
+  "xgb_params": {
+    "objective": "reg:squarederror",
+    "eval_metric": "rmse",
+    "n_estimators": 1600,
+    "learning_rate": 0.025,
+    "max_depth": 3,
+    "min_child_weight": 10,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "reg_alpha": 0.05,
+    "reg_lambda": 3.0,
+    "tree_method": "hist",
+    "random_state": 42,
+    "n_jobs": 4,
+    "early_stopping_rounds": 100
+  },
+  "quick_xgb_params": {
+    "objective": "reg:squarederror",
+    "eval_metric": "rmse",
+    "n_estimators": 350,
+    "learning_rate": 0.05,
+    "max_depth": 3,
+    "min_child_weight": 5,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "reg_alpha": 0.05,
+    "reg_lambda": 3.0,
+    "tree_method": "hist",
+    "random_state": 42,
+    "n_jobs": 4,
+    "early_stopping_rounds": 50
+  },
+  "blend_summary": {
+    "scenario": "lagged_only_no_same_quarter_exog_forecast",
+    "w_xgb_valid_MAE_unrestricted": 0.76,
+    "w_lag1_valid_MAE_unrestricted": 0.24,
+    "valid_MAE_at_w": 35.206356637080425,
+    "w_xgb_valid_RMSE_unrestricted": 0.67,
+    "valid_RMSE_at_w": 61.99080940720583,
+    "forced_50_percent_weight_used": false,
+    "xgb_bias_correction_method": "linear_validation_calibration",
+    "blend_bias_correction_method": "additive_mean_residual",
+    "selected_feature_count": 430,
+    "selected_lad_dummy_count": 121,
+    "top_k_features_fixed": null,
+    "final_prediction_column_selected_by_valid_MAE": "pred_xgboost_bc_lag1_blend_bias_corrected",
+    "final_model_name_selected_by_valid_MAE": "Final blend + bias correction"
+  },
+  "bias_corrections": [
+    {
+      "model_name": "Growth-from-lag1 XGBoost raw",
+      "method": "linear_validation_calibration",
+      "intercept": 10.152377828427575,
+      "slope": 0.9305660533187724,
+      "valid_MAE": 35.47173245361584,
+      "valid_RMSE": 62.79591843345636,
+      "valid_bias_actual_minus_predicted": -9.158659431163463e-15,
+      "n_valid_for_correction": 1142
+    },
+    {
+      "model_name": "Unrestricted XGBoost-bc + lag1 blend",
+      "method": "additive_mean_residual",
+      "intercept": -1.2155516637478163,
+      "slope": 1.0,
+      "valid_MAE": 35.121375730394305,
+      "valid_RMSE": 62.03955684337549,
+      "valid_bias_actual_minus_predicted": -6.371241343418061e-15,
+      "n_valid_for_correction": 1142
+    }
+  ],
+  "excluded_direct_lag1_target_features": [
+    "homelessness_total_assessments_lag1q",
+    "log1p_homelessness_total_assessments_lag1q",
+    "computed_homelessness_rate_per_1000_lag1q",
+    "log1p_computed_homelessness_rate_per_1000_lag1q"
+  ]
+}
