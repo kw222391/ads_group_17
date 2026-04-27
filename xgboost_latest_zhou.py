@@ -1,40 +1,7 @@
-r"""
-Improved XGBoost homelessness models
-====================================
+"""Forecast homelessness with a lagged-feature XGBoost model.
 
-This version is adapted for the latest data file:
-    D:\UOB\ads_group_17\ads_group_17\data\clean\Final all Junxi\monthly_lad_panel_2000_2025_replaced_homelessness_final.csv
-
-Main changes versus the previous report-only script:
-1. Uses the new integrated monthly CSV. The homelessness target is read directly
-   from the same file, so a separate homelessness CSV is no longer required.
-2. Forecast-only setup: the nowcasting scenario has been removed. The model excludes
-   same-quarter exogenous predictors and uses only lagged predictors, target history,
-   time controls and optional LAD dummies.
-3. All lag, diff and rolling features are created after grouping by LAD.
-4. Candidate and selected feature types are explicitly reported and saved.
-5. Feature selection combines missing/constant cleaning, target-correlation screening,
-   pairwise-correlation pruning, and a quick XGBoost gain screen.
-6. TOP_K_FEATURES is None by default, so the quick XGBoost screen determines the number of
-   selected features. You can override with --top-k.
-7. Adds validation-based bias correction for XGBoost and the final blend.
-8. Removes any forced 50% blend weight. The blend weight is chosen freely from 0% to 100%
-   XGBoost weight using validation MAE.
-9. Adds seaborn diagnostic plots shown interactively by default for PyCharm's Scientific
-   plotting sidebar, and saved to disk.
-10. Adds more print logs and exports detailed intermediate CSV files.
-11. LAD dummies are included by default but are not forced through feature selection unless
-    --force-keep-lad is used.
-12. England aggregate timeline plots are sorted chronologically by PeriodIndex.
-
-Required packages:
-    pip install pandas numpy matplotlib seaborn scikit-learn xgboost joblib scipy
-
-Recommended run in PyCharm:
-    python xgboost_latest_zhou.py
-
-Optional run without opening figures:
-    python xgboost_latest_zhou.py --no-show-plots
+The script builds a quarterly LAD panel, trains a growth-from-lag1 model,
+calibrates/blends it on the validation split, and saves report-ready figures.
 """
 
 from __future__ import annotations
@@ -46,7 +13,7 @@ import os
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import joblib
 import matplotlib.pyplot as plt
@@ -57,11 +24,6 @@ from sklearn.feature_selection import f_regression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 try:
-    from scipy import stats
-except Exception:  # pragma: no cover
-    stats = None
-
-try:
     from xgboost import XGBRegressor
 except Exception as exc:  # pragma: no cover
     raise ImportError("xgboost is required. Install it with: pip install xgboost") from exc
@@ -70,14 +32,10 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 
-# =============================================================================
-# 0. CONFIG
-# =============================================================================
+# Config
 
-DEFAULT_MONTHLY_FILE = (
-    r"D:\UOB\ads_group_17\ads_group_17\data\clean\Final all Junxi"
-    r"\monthly_lad_panel_2000_2025_replaced_homelessness_final.csv"
-)
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_MONTHLY_FILE = str(BASE_DIR / "data" / "clean" / "Final all Junxi.gz")
 
 OUTPUT_DIR = Path("xgboost_improved_outputs")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -89,8 +47,7 @@ TARGET_COL = "homelessness_total_assessments"
 AUX_HOMELESSNESS_COLS = ["homelessness_relief", "homelessness_per_1000"]
 TOTAL_CPI_COL = "cpi_00_all_items"
 
-# Same chronological split as before. In the uploaded latest file, target values appear
-# to be available through 2025Q3, so test will normally evaluate 2025Q1-2025Q3.
+# Chronological split.
 MODELLING_START_QUARTER = "2019Q3"
 TRAIN_END_Q = "2023Q4"
 VALID_START_Q = "2024Q1"
@@ -98,22 +55,22 @@ VALID_END_Q = "2024Q4"
 TEST_START_Q = "2025Q1"
 TEST_END_Q = "2025Q4"
 
-# Feature engineering settings.
+# Feature engineering.
 LAGS_Q = [1, 2, 4, 8]
 ROLL_WINDOWS_Q = [4, 8]
 ADD_LAD_DUMMIES = True
 FORCE_KEEP_LAD_DUMMIES = False
 ADD_TIME_FEATURES = True
 
-# Feature selection settings.
+# Feature selection.
 DROP_FEATURES_MISSING_ABOVE = 0.80
 PAIRWISE_CORR_PRUNE_THRESHOLD = 0.985
 TARGET_CORR_MIN_ABS = 0.005
-TOP_K_FEATURES: Optional[int] = None  # None = no fixed top-k; quick XGB decides.
+TOP_K_FEATURES: Optional[int] = None
 MIN_AUTO_FEATURES = 50
 MAX_AUTO_FEATURES: Optional[int] = None
 
-# Main XGBoost hyperparameters.
+# Main XGBoost settings.
 XGB_N_ESTIMATORS = 1600
 XGB_LEARNING_RATE = 0.025
 XGB_MAX_DEPTH = 3
@@ -124,49 +81,189 @@ XGB_REG_ALPHA = 0.05
 XGB_REG_LAMBDA = 3.0
 XGB_EARLY_STOPPING_ROUNDS = 100
 
-# Quick feature-selection XGBoost. This is intentionally smaller than the final model.
+# Smaller XGBoost used only for feature selection.
 QUICK_XGB_N_ESTIMATORS = 350
 QUICK_XGB_LEARNING_RATE = 0.05
 QUICK_XGB_EARLY_STOPPING_ROUNDS = 50
 
-# Plot settings. True helps PyCharm show figures in the Scientific/Plots sidebar.
+# Plot settings.
 SAVE_PLOTS = True
 SHOW_PLOTS = True
 
-sns.set_theme(style="whitegrid")
+ACADEMIC_COLORS = {
+    "blue": "#0072B2",
+    "sky": "#56B4E9",
+    "green": "#009E73",
+    "orange": "#E69F00",
+    "vermillion": "#D55E00",
+    "red": "#C1121F",
+    "purple": "#CC79A7",
+    "gray": "#6B7280",
+    "light_gray": "#D1D5DB",
+    "black": "#111827",
+}
+ACADEMIC_PALETTE = [
+    ACADEMIC_COLORS["blue"],
+    ACADEMIC_COLORS["vermillion"],
+    ACADEMIC_COLORS["green"],
+    ACADEMIC_COLORS["purple"],
+    ACADEMIC_COLORS["orange"],
+    ACADEMIC_COLORS["gray"],
+]
+SCENARIO_LABELS = {
+    "lagged_only_no_same_quarter_exog_forecast": "Forecast",
+}
+MODEL_LABELS = {
+    "Lag-1 baseline": "Lag-1 baseline",
+    "Growth-from-lag1 XGBoost raw": "XGBoost raw",
+    "Growth-from-lag1 XGBoost + bias correction": "XGBoost + bias correction",
+    "XGBoost-bc + lag-1 blend, unrestricted": "XGBoost + lag-1 blend",
+    "Final blend + bias correction": "Final blend + correction",
+}
+SERIES_LABELS = {
+    "actual": "Actual",
+    "predicted": "Predicted",
+}
+PLOT_MODEL_ORDER = [
+    "Lag-1 baseline",
+    "Growth-from-lag1 XGBoost + bias correction",
+    "Final blend + bias correction",
+]
+PLOT_MODEL_LABELS = {
+    "Lag-1 baseline": "Baseline",
+    "Growth-from-lag1 XGBoost + bias correction": "XGBoost",
+    "Final blend + bias correction": "Blend",
+}
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
+    "font.size": 13,
+    "axes.titlesize": 16,
+    "axes.labelsize": 14,
+    "xtick.labelsize": 11,
+    "ytick.labelsize": 11,
+    "legend.fontsize": 11,
+    "figure.titlesize": 16,
+    "axes.linewidth": 0.8,
+    "axes.edgecolor": ACADEMIC_COLORS["black"],
+    "axes.labelcolor": ACADEMIC_COLORS["black"],
+    "xtick.color": ACADEMIC_COLORS["black"],
+    "ytick.color": ACADEMIC_COLORS["black"],
+    "axes.unicode_minus": False,
+})
+
+sns.set_theme(
+    context="paper",
+    style="whitegrid",
+    palette=ACADEMIC_PALETTE,
+    rc={
+        "text.usetex": True,
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
+        "font.size": 13,
+        "axes.titlesize": 16,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 11,
+        "ytick.labelsize": 11,
+        "legend.fontsize": 11,
+        "figure.titlesize": 16,
+        "axes.linewidth": 0.8,
+        "axes.grid": True,
+        "grid.color": "#E5E7EB",
+        "grid.linewidth": 0.7,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    },
+)
 
 
-# =============================================================================
-# 1. UTILITIES
-# =============================================================================
+# Utilities
 
 def log(message: str, level: str = "INFO") -> None:
+    """Print a timestamped log message."""
     now = datetime.now().strftime("%H:%M:%S")
     print(f"[{now}] [{level}] {message}")
 
 
 def print_section(title: str) -> None:
+    """Print a visible section heading in the console."""
     print("\n" + "=" * 96)
     print(title)
     print("=" * 96)
 
 
+def plot_text(value: object) -> str:
+    """LaTeX-safe plot text with underscores shown as spaces."""
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return ""
+    text = str(value)
+    text = text.replace("_", " ")
+    text = text.replace("—", "-").replace("–", "-")
+    for src, dst in {
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "{": r"\{",
+        "}": r"\}",
+    }.items():
+        text = text.replace(src, dst)
+    return text
+
+
+def scenario_plot_label(scenario_name: str) -> str:
+    """Return the short label used in plot titles and legends."""
+    return plot_text(SCENARIO_LABELS.get(scenario_name, scenario_name))
+
+
+def model_plot_label(model_name: str) -> str:
+    """Return the short display name for a model."""
+    return plot_text(PLOT_MODEL_LABELS.get(model_name, MODEL_LABELS.get(model_name, model_name)))
+
+
+def series_plot_label(series_name: str) -> str:
+    """Return the display name for a plotted series."""
+    return plot_text(SERIES_LABELS.get(series_name, series_name))
+
+
+def prepare_plot_category(series: pd.Series) -> pd.Series:
+    """Clean category labels before sending them to Matplotlib."""
+    return series.astype(str).map(plot_text)
+
+
+def midpoint_time(start: pd.Timestamp, end: pd.Timestamp) -> pd.Timestamp:
+    """Return the midpoint between two timestamps."""
+    return start + (end - start) / 2
+
+
+def polish_axes(ax: plt.Axes) -> None:
+    """Apply the shared report-figure axis style."""
+    ax.grid(True, axis="y", color="#E5E7EB", linewidth=0.7)
+    ax.grid(False, axis="x")
+    sns.despine(ax=ax)
+
+
 def quarter_to_period(q: str | pd.Period) -> pd.Period:
+    """Convert a quarter string to a quarterly Period."""
     if isinstance(q, pd.Period):
         return q.asfreq("Q")
     return pd.Period(str(q), freq="Q")
 
 
 def is_real_english_lad_code(s: pd.Series) -> pd.Series:
-    """Keep LAD codes and drop England/region aggregate rows such as E92000001/E12000007."""
+    """Identify real English LAD rows."""
     return s.astype(str).str.match(r"^E0[6789]", na=False)
 
 
 def safe_log1p(x: pd.Series | np.ndarray) -> pd.Series | np.ndarray:
+    """Apply log1p after clipping negative values to zero."""
     return np.log1p(np.clip(x, 0, None))
 
 
 def safe_divide(numerator: pd.Series | np.ndarray, denominator: pd.Series | np.ndarray) -> np.ndarray:
+    """Divide arrays while returning NaN for invalid denominators."""
     num = np.asarray(numerator, dtype=float)
     den = np.asarray(denominator, dtype=float)
     out = np.full_like(num, np.nan, dtype=float)
@@ -176,6 +273,7 @@ def safe_divide(numerator: pd.Series | np.ndarray, denominator: pd.Series | np.n
 
 
 def smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute symmetric mean absolute percentage error."""
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     denom = np.abs(y_true) + np.abs(y_pred)
@@ -186,6 +284,7 @@ def smape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    """Compute the metrics used throughout the report."""
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     mask = np.isfinite(y_true) & np.isfinite(y_pred)
@@ -215,7 +314,7 @@ def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
 
 
 def infer_intended_feature_type(feature: str) -> str:
-    """Human-readable explicit intended type for model features."""
+    """Label a feature with its intended numeric type."""
     if feature.startswith("lad_"):
         return "int8_dummy"
     if feature in {"post_covid_2020plus", "cost_of_living_shock_2022plus"}:
@@ -228,6 +327,7 @@ def infer_intended_feature_type(feature: str) -> str:
 
 
 def ensure_numeric_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Coerce a feature table to numeric dtypes for XGBoost."""
     out = df.copy()
     for c in out.columns:
         if not pd.api.types.is_numeric_dtype(out[c]):
@@ -243,11 +343,13 @@ def ensure_numeric_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_figure(path: Path) -> None:
+    """Save the current figure and optionally show it interactively."""
+    for ax in plt.gcf().axes:
+        polish_axes(ax)
     if SAVE_PLOTS:
-        plt.tight_layout()
-        plt.savefig(path, dpi=170, bbox_inches="tight")
+        plt.tight_layout(pad=0.4)
+        plt.savefig(path, dpi=300, bbox_inches="tight")
     if SHOW_PLOTS:
-        # In PyCharm, enable: Settings > Tools > Python Scientific > Show plots in tool window.
         plt.show(block=False)
         plt.pause(0.1)
     else:
@@ -255,11 +357,13 @@ def save_figure(path: Path) -> None:
 
 
 def resolve_input_path(user_path: str, fallback_filename: str) -> Path:
-    """Use the given path; if not found, try local/script and /mnt/data fallbacks."""
+    """Resolve an input path with local fallbacks."""
     candidates = [
         Path(user_path),
+        BASE_DIR / "data" / "clean" / "Final all Junxi.gz",
         Path(__file__).resolve().parent / fallback_filename,
         Path.cwd() / fallback_filename,
+        Path.cwd() / "data" / "clean" / "Final all Junxi.gz",
         Path("/mnt/data") / fallback_filename,
     ]
     for p in candidates:
@@ -270,16 +374,15 @@ def resolve_input_path(user_path: str, fallback_filename: str) -> Path:
 
 
 def write_json(path: Path, obj: Dict[str, object]) -> None:
+    """Write a JSON file with stable formatting."""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False, default=str)
 
 
-# =============================================================================
-# 2. DATA LOADING: NEW INTEGRATED MONTHLY CSV
-# =============================================================================
+# Data loading
 
 def monthly_columns_to_read(csv_path: Path) -> List[str]:
-    """Read variables used by the model. CPI categories are deliberately excluded."""
+    """Choose the monthly columns needed for this model."""
     report_cols = [
         "year", "month", "lad_code", "lad_name",
         "average_house_price",
@@ -318,6 +421,7 @@ def monthly_columns_to_read(csv_path: Path) -> List[str]:
 
 
 def load_monthly_panel(monthly_file: Path) -> pd.DataFrame:
+    """Load the monthly file and add dates, quarters, and basic types."""
     print_section("Loading latest integrated monthly panel")
     usecols = monthly_columns_to_read(monthly_file)
     df = pd.read_csv(monthly_file, usecols=usecols)
@@ -347,7 +451,7 @@ def load_monthly_panel(monthly_file: Path) -> pd.DataFrame:
     if target_nonmissing:
         print(f"Target quarter range: {target_quarters.min()} to {target_quarters.max()}")
 
-    # Check whether quarterly target is duplicated consistently across months.
+    # Guard against inconsistent target values within the same LAD-quarter.
     target_check = (
         df[df[TARGET_COL].notna()]
         .groupby(["lad_code", "quarter"], observed=True)[TARGET_COL]
@@ -360,6 +464,7 @@ def load_monthly_panel(monthly_file: Path) -> pd.DataFrame:
 
 
 def monthly_to_quarterly_features(monthly: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate monthly rows into a full quarterly LAD panel."""
     print_section("Aggregating monthly features to quarterly LAD panel")
     numeric_cols = [c for c in monthly.columns if c not in {"lad_code", "lad_name", "date", "quarter"}]
     agg = {c: "mean" for c in numeric_cols}
@@ -367,7 +472,7 @@ def monthly_to_quarterly_features(monthly: pd.DataFrame) -> pd.DataFrame:
 
     qdf = monthly.groupby(["lad_code", "quarter"], observed=True, as_index=False).agg(agg)
 
-    # Reindex to a full calendar-quarter grid. This prevents lag1 from jumping across missing quarters.
+    # Keep lags from jumping over missing quarters.
     lad_names = qdf.groupby("lad_code", observed=True)["lad_name"].agg(
         lambda s: s.dropna().iloc[-1] if s.dropna().size else np.nan
     )
@@ -394,25 +499,25 @@ def monthly_to_quarterly_features(monthly: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_quarterly_panel(monthly_file: Path) -> pd.DataFrame:
+    """Build the quarterly panel from the monthly input file."""
     monthly = load_monthly_panel(monthly_file)
     qdf = monthly_to_quarterly_features(monthly)
     return qdf
 
 
-# =============================================================================
-# 3. FEATURE ENGINEERING
-# =============================================================================
+# Feature engineering
 
 def group_shift(df: pd.DataFrame, value_col: str, lag: int) -> pd.Series:
-    """Group-safe shift. This is the only helper used for lag features."""
+    """Shift a column within each LAD."""
     return df.groupby("lad_code", observed=True, sort=False)[value_col].shift(lag)
 
 
 def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], List[str], List[str]]:
+    """Create model features and return the feature groups."""
     print_section("Feature engineering with group-safe lags")
     qdf = qdf.sort_values(["lad_code", "quarter"]).copy()
 
-    # Enforce CPI rule: only cpi_00_all_items can remain.
+    # Keep only the total CPI series.
     cpi_to_drop = [c for c in qdf.columns if c.startswith("cpi_") and c != TOTAL_CPI_COL]
     if cpi_to_drop:
         qdf = qdf.drop(columns=cpi_to_drop)
@@ -441,7 +546,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
     ]
     base_exog = [c for c in base_exog if c in qdf.columns]
 
-    # Derived affordability/living-cost features.
+    # Affordability and living-cost ratios.
     constructed: List[str] = []
     if TOTAL_CPI_COL in qdf.columns and "income" in qdf.columns:
         qdf["real_income_cpi_adjusted"] = safe_divide(qdf["income"] * 100.0, qdf[TOTAL_CPI_COL])
@@ -463,7 +568,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
 
     same_quarter_exog = base_exog + constructed
 
-    # Log transforms for positive levels.
+    # Log versions of positive-valued controls.
     positive_for_log = [
         "average_house_price", "seasonally_adjusted_average_house_price", "house_price_index",
         "house_sales_volume", "unemployment_count", "private_rental_price_index",
@@ -479,7 +584,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
             log_features.append(new_c)
     same_quarter_exog += log_features
 
-    # Quarter-on-quarter and year-on-year changes by LAD.
+    # LAD-level growth rates.
     pct_features: List[str] = []
     for c in base_exog + constructed:
         if c not in qdf.columns:
@@ -493,7 +598,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
         pct_features.extend([qoq, yoy])
     same_quarter_exog += pct_features
 
-    # Lag exogenous variables by 1, 2, 4, and 8 quarters.
+    # Lagged external predictors.
     lagged_exog: List[str] = []
     for c in same_quarter_exog:
         if c not in qdf.columns:
@@ -503,7 +608,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
             qdf[new_c] = group_shift(qdf, c, lag)
             lagged_exog.append(new_c)
 
-    # Target history. Same-quarter target is never a feature.
+    # Past target values only.
     target_history: List[str] = []
     qdf["log1p_homelessness_total"] = safe_log1p(qdf[TARGET_COL])
     for lag in LAGS_Q:
@@ -532,7 +637,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
             qdf[log_relief_col] = safe_log1p(qdf[relief_col])
             target_history += [relief_col, log_relief_col]
 
-    # Past rolling means/stds: shift first within LAD, then roll within LAD.
+    # Rolling target history.
     grouped = qdf.groupby("lad_code", observed=True, sort=False)
     for win in ROLL_WINDOWS_Q:
         mean_col = f"{TARGET_COL}_rolling{win}_mean_lag1q"
@@ -541,7 +646,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
         qdf[std_col] = grouped[TARGET_COL].transform(lambda s: s.shift(1).rolling(win, min_periods=2).std())
         target_history += [mean_col, std_col]
 
-    # Previous observed log-growth features: diff and shift are both within LAD.
+    # Previous target growth.
     qdf["target_log_growth_lag1q"] = grouped["log1p_homelessness_total"].transform(lambda s: s.diff(1).shift(1))
     qdf["target_log_growth_lag4q"] = grouped["log1p_homelessness_total"].transform(lambda s: s.diff(4).shift(1))
     target_history += ["target_log_growth_lag1q", "target_log_growth_lag4q"]
@@ -566,6 +671,7 @@ def add_report_features(qdf: pd.DataFrame) -> Tuple[pd.DataFrame, List[str], Lis
 
 
 def feature_group(feature: str) -> str:
+    """Map a feature name to a readable group."""
     f = feature.lower()
     if "homelessness_total_assessments" in f or "homelessness_rate" in f or "homelessness_per_1000" in f or "homelessness_relief" in f or "target_log_growth" in f:
         return "target history"
@@ -596,11 +702,10 @@ def feature_group(feature: str) -> str:
     return "other controls"
 
 
-# =============================================================================
-# 4. MODELLING TABLE AND EXPLICIT FEATURE TYPE REPORTS
-# =============================================================================
+# Modelling table
 
 def add_lad_dummies(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+    """Add LAD fixed-effect dummy columns when requested."""
     if not ADD_LAD_DUMMIES:
         return df, []
     dummies = pd.get_dummies(df["lad_code"].astype(str), prefix="lad", dtype=np.int8)
@@ -617,6 +722,7 @@ def build_model_table(
     scenario_name: str,
     out_dir: Path,
 ) -> Tuple[pd.DataFrame, List[str]]:
+    """Build the train/validation/test table for one forecast setup."""
     print_section(f"Building modelling table: {scenario_name}")
     df = qdf.copy()
     start_q = quarter_to_period(MODELLING_START_QUARTER)
@@ -627,7 +733,7 @@ def build_model_table(
     if lag1_col not in df.columns or log_lag1_col not in df.columns:
         raise ValueError("Lag-1 target features were not created correctly.")
 
-    # Growth target: g_it = log(1 + y_it) - log(1 + y_i,t-1).
+    # Predict growth from the previous observed quarter.
     df = df[df[lag1_col].notna()].copy()
     df["target_growth_from_lag1"] = safe_log1p(df[TARGET_COL]) - safe_log1p(df[lag1_col])
 
@@ -649,7 +755,7 @@ def build_model_table(
     df, lad_dummy_cols = add_lad_dummies(df)
     feature_cols += lad_dummy_cols
 
-    # Leakage exclusions: same-quarter homelessness outcomes are never model inputs.
+    # Drop contemporaneous outcome information.
     forbidden_exact = {
         TARGET_COL,
         "homelessness_threatened",
@@ -660,8 +766,7 @@ def build_model_table(
         "target_growth_from_lag1",
     }
 
-    # For the growth-from-lag1 target, direct lag-1 count/log-count is used in reconstruction,
-    # so it is excluded from XGBoost's input matrix.
+    # Lag-1 count is used after prediction, so keep it out of XGBoost.
     direct_lag1_target_features = {
         f"{TARGET_COL}_lag1q",
         f"log1p_{TARGET_COL}_lag1q",
@@ -710,6 +815,7 @@ def build_model_table(
 
 
 def make_feature_type_report(df: pd.DataFrame, features: List[str]) -> pd.DataFrame:
+    """Summarise feature types and missingness."""
     rows = []
     for c in features:
         s = df[c] if c in df.columns else pd.Series(dtype=float)
@@ -725,7 +831,7 @@ def make_feature_type_report(df: pd.DataFrame, features: List[str]) -> pd.DataFr
 
 
 def infer_panel_column_type(column: str, series: pd.Series) -> str:
-    """Explicit type labels for all raw/engineered panel columns, not only selected model features."""
+    """Label a panel column with a compact type name."""
     if column in {"lad_code", "lad_name"}:
         return "category_identifier"
     if column == "quarter":
@@ -748,6 +854,7 @@ def infer_panel_column_type(column: str, series: pd.Series) -> str:
 
 
 def make_panel_column_type_report(df: pd.DataFrame) -> pd.DataFrame:
+    """Summarise all columns in the engineered panel."""
     rows = []
     for c in df.columns:
         s = df[c]
@@ -770,12 +877,10 @@ def make_panel_column_type_report(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# =============================================================================
-# 5. FEATURE SELECTION: MISSING, CORRELATION, PRUNING, QUICK XGBOOST
-# =============================================================================
+# Feature selection
 
 def protected_feature_mask(feature: str) -> bool:
-    """Core variables to retain when available; LAD dummies are only protected if requested."""
+    """Mark core features that should survive cleaning when possible."""
     if FORCE_KEEP_LAD_DUMMIES and feature.startswith("lad_"):
         return True
     core_bases = [
@@ -805,6 +910,7 @@ def protected_feature_mask(feature: str) -> bool:
 
 
 def quick_xgb_params() -> Dict[str, object]:
+    """Return parameters for the feature-selection XGBoost."""
     return {
         "objective": "reg:squarederror",
         "eval_metric": "rmse",
@@ -829,6 +935,7 @@ def fit_quick_xgb_selector(
     X_valid: pd.DataFrame,
     y_valid: pd.Series,
 ) -> XGBRegressor:
+    """Fit the smaller XGBoost model used to rank features."""
     params = quick_xgb_params()
     try:
         model = XGBRegressor(**params)
@@ -846,7 +953,7 @@ def correlation_prune_features(
     protected: set[str],
     out_path: Path,
 ) -> Tuple[List[str], pd.DataFrame]:
-    """Drop highly correlated features, keeping protected and target-correlated features first."""
+    """Drop redundant correlated features."""
     if X_filled.shape[1] <= 1:
         return X_filled.columns.tolist(), pd.DataFrame()
 
@@ -893,6 +1000,7 @@ def clean_and_select_features(
     scenario_name: str,
     out_dir: Path,
 ) -> Tuple[List[str], pd.DataFrame]:
+    """Clean, rank, and select the final feature set."""
     print_section(f"Feature cleaning and selection: {scenario_name}")
     train_mask = df["split"] == "train"
     valid_mask = df["split"] == "valid"
@@ -904,7 +1012,7 @@ def clean_and_select_features(
 
     protected = {c for c in feature_cols if protected_feature_mask(c)}
 
-    # 1) Drop all-missing, constant, or too-missing features using training data only.
+    # Screen on the training split only.
     missing_rate = X_train.isna().mean()
     nunique = X_train.nunique(dropna=True)
     keep_after_missing: List[str] = []
@@ -934,7 +1042,7 @@ def clean_and_select_features(
     X_valid = X_valid[keep_after_missing]
     protected = {c for c in keep_after_missing if c in protected}
 
-    # 2) Target-correlation and univariate ranking on training data only.
+    # Rank simple target relationships.
     med = X_train.median(numeric_only=True)
     X_filled = X_train.fillna(med).fillna(0.0)
     y_aligned = pd.Series(y_train.values, index=X_filled.index, name="target_growth_from_lag1")
@@ -968,7 +1076,7 @@ def clean_and_select_features(
     ranking["intended_type"] = ranking["feature"].map(infer_intended_feature_type)
     ranking["protected_feature"] = ranking["feature"].isin(protected)
 
-    # 3) Pairwise correlation pruning.
+    # Remove near-duplicates.
     kept_after_prune, dropped_corr_df = correlation_prune_features(
         X_filled,
         ranking,
@@ -977,7 +1085,7 @@ def clean_and_select_features(
     )
     ranking["kept_after_correlation_pruning"] = ranking["feature"].isin(kept_after_prune)
 
-    # 4) Quick XGBoost feature selection.
+    # Add quick-XGBoost signal.
     X_train_pruned = ensure_numeric_df(df.loc[train_mask, kept_after_prune])
     X_valid_pruned = ensure_numeric_df(df.loc[valid_mask, kept_after_prune])
     quick_model = fit_quick_xgb_selector(X_train_pruned, y_train, X_valid_pruned, y_valid)
@@ -990,7 +1098,7 @@ def clean_and_select_features(
     ranking["quick_xgb_weight"] = ranking["feature"].map(quick_weight).fillna(0.0)
     ranking["quick_xgb_gain_positive"] = ranking["quick_xgb_gain"] > 0
 
-    # Combined rank score for optional filling/trimming.
+    # Combine the ranking signals.
     for col in ["abs_target_corr", "abs_spearman_target_corr", "univariate_f", "quick_xgb_gain"]:
         ranking[f"{col}_rank_pct"] = ranking[col].rank(pct=True, method="average")
     ranking["combined_selection_score"] = (
@@ -1000,7 +1108,7 @@ def clean_and_select_features(
         + 2.0 * ranking["quick_xgb_gain_rank_pct"]
     )
 
-    # 5) Automatic selected-feature count. No fixed top-k unless TOP_K_FEATURES is set.
+    # Pick the final set.
     if TOP_K_FEATURES is not None:
         selected = list(protected)
         ordered = ranking[ranking["kept_after_correlation_pruning"]].sort_values("combined_selection_score", ascending=False)
@@ -1033,7 +1141,6 @@ def clean_and_select_features(
             selected_set = set(ordered.head(max(MAX_AUTO_FEATURES, len(protected)))["feature"].tolist())
 
         selected = [c for c in feature_cols if c in selected_set and c in kept_after_prune]
-        # Add protected features even if correlation pruning kept them but original order filter missed them.
         for c in protected:
             if c in kept_after_prune and c not in selected:
                 selected.append(c)
@@ -1066,11 +1173,10 @@ def clean_and_select_features(
     return selected, ranking
 
 
-# =============================================================================
-# 6. TRAINING, PREDICTION, BIAS CORRECTION, BLENDING
-# =============================================================================
+# Training and prediction
 
 def xgb_params() -> Dict[str, object]:
+    """Return parameters for the final XGBoost model."""
     return {
         "objective": "reg:squarederror",
         "eval_metric": "rmse",
@@ -1096,6 +1202,7 @@ def fit_xgboost_growth_model(
     y_valid: pd.Series,
     scenario_name: str,
 ) -> XGBRegressor:
+    """Fit the final growth-from-lag1 XGBoost model."""
     print_section(f"Training final Growth-from-lag1 XGBoost: {scenario_name}")
     params = xgb_params()
     for k, v in params.items():
@@ -1116,13 +1223,14 @@ def fit_xgboost_growth_model(
 
 
 def growth_to_count(pred_growth: np.ndarray, rows: pd.DataFrame) -> np.ndarray:
+    """Convert predicted log-growth back to assessment counts."""
     lag1 = rows[f"{TARGET_COL}_lag1q"].astype(float).values
     pred = np.expm1(np.log1p(np.clip(lag1, 0, None)) + np.asarray(pred_growth, dtype=float))
     return np.clip(pred, 0.0, None)
 
 
 def fit_bias_correction(y_true_valid: np.ndarray, pred_valid: np.ndarray, model_name: str) -> Dict[str, float | str]:
-    """Choose raw, additive, or linear validation calibration by validation MAE."""
+    """Choose a simple validation calibration by MAE."""
     y = np.asarray(y_true_valid, dtype=float)
     p = np.asarray(pred_valid, dtype=float)
     mask = np.isfinite(y) & np.isfinite(p)
@@ -1134,6 +1242,7 @@ def fit_bias_correction(y_true_valid: np.ndarray, pred_valid: np.ndarray, model_
     candidates: List[Dict[str, float | str]] = []
 
     def add_candidate(method: str, intercept: float, slope: float) -> None:
+        """Store one calibration option."""
         corrected = np.clip(intercept + slope * p, 0.0, None)
         candidates.append({
             "model_name": model_name,
@@ -1151,7 +1260,7 @@ def fit_bias_correction(y_true_valid: np.ndarray, pred_valid: np.ndarray, model_
 
     if len(np.unique(p)) > 2:
         slope, intercept = np.polyfit(p, y, deg=1)
-        # Prevent extreme validation over-correction.
+        # Avoid extreme validation-only corrections.
         slope = float(np.clip(slope, 0.50, 1.50))
         intercept = float(np.mean(y) - slope * np.mean(p))
         add_candidate("linear_validation_calibration", intercept, slope)
@@ -1162,6 +1271,7 @@ def fit_bias_correction(y_true_valid: np.ndarray, pred_valid: np.ndarray, model_
 
 
 def apply_bias_correction(pred: np.ndarray | pd.Series, correction: Dict[str, float | str]) -> np.ndarray:
+    """Apply a fitted bias correction."""
     p = np.asarray(pred, dtype=float)
     intercept = float(correction.get("intercept", 0.0))
     slope = float(correction.get("slope", 1.0))
@@ -1176,7 +1286,7 @@ def optimize_blend_weight(
     min_weight: float = 0.0,
     max_weight: float = 1.0,
 ) -> Tuple[float, float, pd.DataFrame]:
-    """Choose unrestricted blend weight. w=1 means all XGBoost; w=0 means all lag1."""
+    """Choose the validation blend weight."""
     rows = []
     best_w = float(min_weight)
     best_score = np.inf
@@ -1194,6 +1304,7 @@ def optimize_blend_weight(
 
 
 def evaluate_by_split(pred_df: pd.DataFrame, pred_col: str, model_name: str) -> List[Dict[str, object]]:
+    """Evaluate one prediction column on each split."""
     rows: List[Dict[str, object]] = []
     for split in ["train", "valid", "test"]:
         sub = pred_df[pred_df["split"] == split]
@@ -1205,6 +1316,7 @@ def evaluate_by_split(pred_df: pd.DataFrame, pred_col: str, model_name: str) -> 
 
 
 def get_xgb_importance(model: XGBRegressor, feature_cols: List[str]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Export feature and feature-group importance."""
     booster = model.get_booster()
     out = pd.DataFrame({"feature": feature_cols})
     for imp_type in ["gain", "weight", "cover"]:
@@ -1230,6 +1342,7 @@ def get_xgb_importance(model: XGBRegressor, feature_cols: List[str]) -> Tuple[pd
 
 
 def choose_final_prediction_column(metrics_df: pd.DataFrame) -> str:
+    """Pick the validation-best prediction column."""
     valid = metrics_df[metrics_df["split"] == "valid"].copy()
     valid = valid.sort_values(["MAE", "RMSE"], ascending=True)
     return str(valid.iloc[0]["prediction_column"])
@@ -1241,6 +1354,7 @@ def run_three_report_models(
     scenario_name: str,
     out_dir: Path,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict[str, object], str]:
+    """Train the model family and save the main artefacts."""
     selected_features, selection_ranking = clean_and_select_features(df, feature_cols, scenario_name, out_dir)
 
     train_mask = df["split"] == "train"
@@ -1255,23 +1369,23 @@ def run_three_report_models(
 
     model = fit_xgboost_growth_model(X_train, y_train, X_valid, y_valid, scenario_name)
 
-    # Base prediction table.
+    # Prediction table.
     pred_df = df[[
         "lad_code", "lad_name", "quarter", "quarter_date", "year", "quarter_num",
         TARGET_COL, f"{TARGET_COL}_lag1q", "split",
     ]].copy()
     pred_df["quarter"] = pred_df["quarter"].astype(str)
 
-    # Model 1: lag-1 persistence baseline.
+    # Lag-1 baseline.
     pred_df["pred_lag1_baseline"] = pred_df[f"{TARGET_COL}_lag1q"].astype(float).clip(lower=0)
 
-    # Model 2: Growth-from-lag1 XGBoost raw.
+    # XGBoost growth model.
     pred_growth_all = np.full(len(df), np.nan)
     for mask, X_part in [(train_mask, X_train), (valid_mask, X_valid), (test_mask, X_test)]:
         pred_growth_all[np.where(mask.values)[0]] = model.predict(X_part)
     pred_df["pred_growth_from_lag1_xgboost_raw"] = growth_to_count(pred_growth_all, df)
 
-    # Bias correction for XGBoost raw count predictions using validation only.
+    # Validation calibration.
     y_val = pred_df.loc[valid_mask.values, TARGET_COL].astype(float).values
     xgb_val_raw = pred_df.loc[valid_mask.values, "pred_growth_from_lag1_xgboost_raw"].astype(float).values
     xgb_correction = fit_bias_correction(y_val, xgb_val_raw, "Growth-from-lag1 XGBoost raw")
@@ -1280,7 +1394,7 @@ def run_three_report_models(
         xgb_correction,
     )
 
-    # Model 3: unrestricted blend. No forced 50% XGBoost weight.
+    # Validation blend.
     xgb_val_bc = pred_df.loc[valid_mask.values, "pred_growth_from_lag1_xgboost_bias_corrected"].astype(float).values
     lag1_val = pred_df.loc[valid_mask.values, "pred_lag1_baseline"].astype(float).values
     w_mae, valid_mae, blend_curve = optimize_blend_weight(y_val, xgb_val_bc, lag1_val, metric="MAE", min_weight=0.0, max_weight=1.0)
@@ -1293,7 +1407,7 @@ def run_three_report_models(
         None,
     )
 
-    # Optional final bias correction on the blend itself.
+    # Final calibration.
     blend_val = pred_df.loc[valid_mask.values, "pred_xgboost_bc_lag1_blend_unrestricted"].astype(float).values
     blend_correction = fit_bias_correction(y_val, blend_val, "Unrestricted XGBoost-bc + lag1 blend")
     pred_df["pred_xgboost_bc_lag1_blend_bias_corrected"] = apply_bias_correction(
@@ -1328,7 +1442,7 @@ def run_three_report_models(
     metrics_df = pd.DataFrame(metrics_rows)
     metrics_df.insert(0, "scenario", scenario_name)
 
-    # Add deltas relative to lag-1 within each split.
+    # Compare each model to lag-1.
     baseline_by_split = metrics_df[metrics_df["model"] == "Lag-1 baseline"].set_index("split")
     metrics_df["delta_MAE_vs_lag1"] = metrics_df.apply(
         lambda r: r["MAE"] - baseline_by_split.loc[r["split"], "MAE"] if r["split"] in baseline_by_split.index else np.nan,
@@ -1346,13 +1460,13 @@ def run_three_report_models(
 
     imp_df, group_imp_df = get_xgb_importance(model, selected_features)
 
-    # Blend component-level importance: lag-1 component plus XGB gain groups scaled by selected w.
+    # Blend-level importance.
     component_rows = [{"component": "lag-1 baseline", "share": 1.0 - w_mae}]
     for _, row in group_imp_df.iterrows():
         component_rows.append({"component": f"XGB: {row['group']}", "share": w_mae * float(row["gain_share"])})
     component_imp_df = pd.DataFrame(component_rows).sort_values("share", ascending=False)
 
-    # Worst LAD error summary for final model.
+    # Worst LADs by test error.
     final_errors = pred_df.copy()
     final_errors["final_prediction_column"] = final_pred_col
     final_errors["final_pred"] = final_errors[final_pred_col]
@@ -1372,7 +1486,7 @@ def run_three_report_models(
         .sort_values("MAE", ascending=False)
     )
 
-    # Save artefacts.
+    # Save outputs.
     pred_df.to_csv(out_dir / f"predictions_{scenario_name}.csv", index=False)
     metrics_df.to_csv(out_dir / f"metrics_all_splits_{scenario_name}.csv", index=False)
     metrics_df[metrics_df["split"] == "test"].to_csv(out_dir / f"test_metrics_{scenario_name}.csv", index=False)
@@ -1433,9 +1547,7 @@ def run_three_report_models(
     return pred_df, metrics_df, imp_df, group_imp_df, blend_summary, final_pred_col
 
 
-# =============================================================================
-# 7. PLOTS
-# =============================================================================
+# Plots
 
 def make_report_plots(
     pred_df: pd.DataFrame,
@@ -1446,61 +1558,51 @@ def make_report_plots(
     out_dir: Path,
     final_pred_col: str,
 ) -> None:
+    """Create the figures used in the report."""
     print_section(f"Saving and showing plots: {scenario_name}")
     test_metrics = metrics_df[metrics_df["split"] == "test"].copy()
+    test_metrics = test_metrics[test_metrics["model"].isin(PLOT_MODEL_ORDER)].copy()
+    test_metrics["model"] = pd.Categorical(test_metrics["model"], categories=PLOT_MODEL_ORDER, ordered=True)
+    test_metrics = test_metrics.sort_values("model")
 
-    # Figure 1: test MAE comparison.
+    # Test MAE.
+    test_metrics["model_display"] = test_metrics["model"].astype(str).map(model_plot_label)
     plt.figure(figsize=(10, 5.5))
-    sns.barplot(data=test_metrics, x="model", y="MAE", hue="model", legend=False)
-    plt.ylabel("Test MAE")
+    ax = sns.barplot(
+        data=test_metrics,
+        x="model_display",
+        y="MAE",
+        color=ACADEMIC_COLORS["blue"],
+        edgecolor=ACADEMIC_COLORS["black"],
+        linewidth=0.6,
+    )
+    ax.set_ylabel(plot_text("Test MAE"))
     plt.xlabel("")
-    plt.title(f"Test-set MAE comparison — {scenario_name}")
+    plt.title(plot_text("Test-set MAE comparison"))
     plt.xticks(rotation=25, ha="right")
     save_figure(out_dir / f"fig_test_mae_comparison_{scenario_name}.png")
 
-    # Figure 2: actual vs predicted scatter for final model.
+    # Actual vs predicted.
     test_pred = pred_df[pred_df["split"] == "test"].copy()
     test_pred["final_pred"] = test_pred[final_pred_col]
     plt.figure(figsize=(7, 6))
-    sns.scatterplot(data=test_pred, x=TARGET_COL, y="final_pred", alpha=0.55)
+    sns.scatterplot(
+        data=test_pred,
+        x=TARGET_COL,
+        y="final_pred",
+        alpha=0.55,
+        color=ACADEMIC_COLORS["blue"],
+        edgecolor="white",
+        linewidth=0.25,
+    )
     max_val = np.nanmax([test_pred[TARGET_COL].max(), test_pred["final_pred"].max()])
-    plt.plot([0, max_val], [0, max_val], linestyle="--", linewidth=1)
-    plt.xlabel("Actual homelessness assessments")
-    plt.ylabel("Predicted homelessness assessments")
-    plt.title(f"Actual vs predicted, test — {scenario_name}")
+    plt.plot([0, max_val], [0, max_val], linestyle="--", linewidth=1, color=ACADEMIC_COLORS["red"])
+    plt.xlabel(plot_text("Actual homelessness assessments"))
+    plt.ylabel(plot_text("Predicted homelessness assessments"))
+    plt.title(plot_text("Actual vs predicted, test"))
     save_figure(out_dir / f"fig_actual_vs_predicted_scatter_{scenario_name}.png")
 
-    # Figure 3: residual histogram/KDE.
-    test_pred["residual_actual_minus_pred"] = test_pred[TARGET_COL] - test_pred["final_pred"]
-    plt.figure(figsize=(8, 5))
-    sns.histplot(test_pred["residual_actual_minus_pred"].dropna(), kde=True, bins=35, color="C0")
-    plt.axvline(0, linestyle="--", linewidth=1)
-    plt.xlabel("Residual: actual - predicted")
-    plt.title(f"Residual distribution, test — {scenario_name}")
-    save_figure(out_dir / f"fig_residual_distribution_{scenario_name}.png")
-
-    # Figure 4: QQ plot of residuals.
-    resid = test_pred["residual_actual_minus_pred"].dropna().astype(float).values
-    if len(resid) > 5:
-        plt.figure(figsize=(6.5, 6))
-        if stats is not None:
-            (osm, osr), (slope, intercept, r) = stats.probplot(resid, dist="norm")
-            plt.scatter(osm, osr, alpha=0.55)
-            xline = np.asarray([np.min(osm), np.max(osm)])
-            plt.plot(xline, intercept + slope * xline, linestyle="--", linewidth=1)
-            plt.title(f"QQ plot of test residuals — {scenario_name}\nR={r:.3f}")
-        else:
-            sorted_resid = np.sort(resid)
-            q = np.linspace(0.01, 0.99, len(sorted_resid))
-            normal_q = np.quantile(np.random.default_rng(RANDOM_STATE).normal(size=200000), q)
-            plt.scatter(normal_q, sorted_resid, alpha=0.55)
-            plt.title(f"QQ plot of test residuals — {scenario_name}")
-        plt.xlabel("Theoretical normal quantiles")
-        plt.ylabel("Ordered residuals")
-        save_figure(out_dir / f"fig_qqplot_residuals_{scenario_name}.png")
-
-    # Figure 5: England aggregate actual/prediction by quarter.
-    # Use a PeriodIndex-derived datetime axis so the timeline is always chronological.
+    # England aggregate timeline.
     agg_source = pred_df.copy().assign(final_pred=lambda d: d[final_pred_col])
     agg_source["quarter_period"] = pd.PeriodIndex(agg_source["quarter"].astype(str), freq="Q")
     agg = (
@@ -1512,21 +1614,42 @@ def make_report_plots(
     )
     agg["quarter"] = agg["quarter_period"].astype(str)
     agg["quarter_start"] = agg["quarter_period"].apply(lambda p: p.start_time)
-    agg_long = agg.melt(
-        id_vars=["quarter_period", "quarter", "quarter_start"],
-        value_vars=["actual", "predicted"],
-        var_name="series",
-        value_name="England aggregate",
-    ).sort_values("quarter_start")
-    plt.figure(figsize=(10, 5.5))
-    sns.lineplot(data=agg_long, x="quarter_start", y="England aggregate", hue="series", marker="o")
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.plot(
+        agg["quarter_start"],
+        agg["actual"],
+        marker="o",
+        linewidth=1.8,
+        color=ACADEMIC_COLORS["blue"],
+        label=plot_text("Actual"),
+    )
+    ax.plot(
+        agg["quarter_start"],
+        agg["predicted"],
+        marker="o",
+        linestyle="--",
+        linewidth=1.8,
+        color=ACADEMIC_COLORS["orange"],
+        label=plot_text("Predicted"),
+    )
+    valid_start = quarter_to_period(VALID_START_Q).start_time
+    test_start = quarter_to_period(TEST_START_Q).start_time
+    for boundary in [valid_start, test_start]:
+        ax.axvline(boundary, linestyle="--", linewidth=1, color=ACADEMIC_COLORS["gray"], alpha=0.8)
+    x_start = agg["quarter_start"].min()
+    x_end = agg["quarter_start"].max()
+    ax.text(midpoint_time(x_start, valid_start), 0.98, plot_text("Train"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
+    ax.text(midpoint_time(valid_start, test_start), 0.98, plot_text("Validation"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
+    ax.text(midpoint_time(test_start, x_end), 0.98, plot_text("Test"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
     plt.xticks(agg["quarter_start"].tolist(), agg["quarter"].tolist(), rotation=45, ha="right")
-    plt.title(f"England aggregate actual vs predicted — {scenario_name}")
-    plt.xlabel("Quarter")
+    plt.title(plot_text("England aggregate actual vs predicted"))
+    plt.xlabel(plot_text("Quarter"))
+    plt.ylabel(plot_text("England aggregate"))
+    plt.legend(title="")
     save_figure(out_dir / f"fig_england_aggregate_prediction_{scenario_name}.png")
     agg[["quarter", "quarter_start", "actual", "predicted"]].to_csv(out_dir / f"england_aggregate_prediction_{scenario_name}.csv", index=False)
 
-    # Figure 6: worst LAD errors.
+    # Worst LADs.
     worst_lad = (
         test_pred.assign(abs_error=lambda d: (d[TARGET_COL] - d["final_pred"]).abs())
         .groupby(["lad_code", "lad_name"], observed=True, as_index=False)
@@ -1537,63 +1660,109 @@ def make_report_plots(
     if len(worst_lad) > 0:
         plt.figure(figsize=(10, 7))
         worst_lad["lad_label"] = worst_lad["lad_name"].astype(str) + " (" + worst_lad["lad_code"].astype(str) + ")"
-        sns.barplot(data=worst_lad, y="lad_label", x="MAE", hue="lad_label", legend=False, orient="h")
-        plt.xlabel("Mean absolute error on test quarters")
+        worst_lad["lad_label_display"] = prepare_plot_category(worst_lad["lad_label"])
+        sns.barplot(
+            data=worst_lad,
+            y="lad_label_display",
+            x="MAE",
+            orient="h",
+            color=ACADEMIC_COLORS["blue"],
+            edgecolor=ACADEMIC_COLORS["black"],
+            linewidth=0.5,
+        )
+        plt.xlabel(plot_text("Mean absolute error on test quarters"))
         plt.ylabel("")
-        plt.title(f"Worst LAD test error summary — {scenario_name}")
+        plt.title(plot_text("Worst LAD test error summary"))
         save_figure(out_dir / f"fig_worst_lad_error_summary_{scenario_name}.png")
 
-    # Figure 7: XGBoost feature group gain importance.
+    # Feature-group importance.
     grp = group_imp_df[group_imp_df["gain_share"] > 0].head(15).copy()
     if len(grp) > 0:
         plt.figure(figsize=(9, 6))
         grp["gain_share_percent"] = grp["gain_share"] * 100.0
-        sns.barplot(data=grp, y="group", x="gain_share_percent", hue="group", legend=False, orient="h")
-        plt.xlabel("Gain share (%)")
+        grp["group_display"] = prepare_plot_category(grp["group"])
+        sns.barplot(
+            data=grp,
+            y="group_display",
+            x="gain_share_percent",
+            orient="h",
+            color=ACADEMIC_COLORS["blue"],
+            edgecolor=ACADEMIC_COLORS["black"],
+            linewidth=0.5,
+        )
+        plt.xlabel(plot_text("Gain share (%)"))
         plt.ylabel("")
-        plt.title(f"XGBoost feature-group importance — {scenario_name}")
+        plt.title(plot_text("XGBoost feature-group importance"))
         save_figure(out_dir / f"fig_xgb_feature_group_importance_{scenario_name}.png")
 
-    # Figure 8: blend weight curve.
+    # Blend curve.
     curve_path = out_dir / f"blend_weight_curve_{scenario_name}.csv"
     if curve_path.exists():
         curve = pd.read_csv(curve_path)
         plt.figure(figsize=(8, 5))
-        sns.lineplot(data=curve, x="w_xgb", y="valid_MAE")
+        sns.lineplot(data=curve, x="w_xgb", y="valid_MAE", color=ACADEMIC_COLORS["blue"], linewidth=1.8)
         best_w = float(blend_summary["w_xgb_valid_MAE_unrestricted"])
-        plt.axvline(best_w, linestyle="--", linewidth=1)
-        plt.xlabel("Blend weight on XGBoost-bias-corrected prediction")
-        plt.ylabel("Validation MAE")
-        plt.title(f"Unrestricted blend weight curve — {scenario_name}")
+        plt.axvline(best_w, linestyle="--", linewidth=1, color=ACADEMIC_COLORS["vermillion"])
+        plt.xlabel(plot_text("Blend weight on XGBoost prediction"))
+        plt.ylabel(plot_text("Validation MAE"))
+        plt.title(plot_text("Unrestricted blend weight curve"))
         save_figure(out_dir / f"fig_blend_weight_curve_{scenario_name}.png")
 
 
 def make_combined_scenario_plots(combined_metrics: pd.DataFrame, root_dir: Path) -> None:
+    """Create comparison plots when more than one scenario is present."""
     print_section("Saving and showing combined scenario comparison plots")
     test = combined_metrics[combined_metrics["split"] == "test"].copy()
+    test = test[test["model"].isin(PLOT_MODEL_ORDER)].copy()
+    test["model"] = pd.Categorical(test["model"], categories=PLOT_MODEL_ORDER, ordered=True)
+    test = test.sort_values("model")
+    test["model_display"] = test["model"].astype(str).map(model_plot_label)
+    test["scenario_display"] = test["scenario"].astype(str).map(scenario_plot_label)
     plt.figure(figsize=(11, 5.5))
-    sns.barplot(data=test, x="model", y="MAE", hue="scenario")
+    sns.barplot(
+        data=test,
+        x="model_display",
+        y="MAE",
+        hue="scenario_display",
+        palette=ACADEMIC_PALETTE,
+        edgecolor=ACADEMIC_COLORS["black"],
+        linewidth=0.5,
+    )
     plt.xticks(rotation=25, ha="right")
-    plt.ylabel("Test MAE")
+    plt.ylabel(plot_text("Test MAE"))
     plt.xlabel("")
-    plt.title("Forecast model comparison")
+    plt.title(plot_text("Forecast model comparison"))
+    plt.legend(title="")
     save_figure(root_dir / "fig_combined_scenario_test_mae.png")
 
     valid = combined_metrics[combined_metrics["split"] == "valid"].copy()
+    valid = valid[valid["model"].isin(PLOT_MODEL_ORDER)].copy()
+    valid["model"] = pd.Categorical(valid["model"], categories=PLOT_MODEL_ORDER, ordered=True)
+    valid = valid.sort_values("model")
+    valid["model_display"] = valid["model"].astype(str).map(model_plot_label)
+    valid["scenario_display"] = valid["scenario"].astype(str).map(scenario_plot_label)
     plt.figure(figsize=(11, 5.5))
-    sns.barplot(data=valid, x="model", y="MAE", hue="scenario")
+    sns.barplot(
+        data=valid,
+        x="model_display",
+        y="MAE",
+        hue="scenario_display",
+        palette=ACADEMIC_PALETTE,
+        edgecolor=ACADEMIC_COLORS["black"],
+        linewidth=0.5,
+    )
     plt.xticks(rotation=25, ha="right")
-    plt.ylabel("Validation MAE")
+    plt.ylabel(plot_text("Validation MAE"))
     plt.xlabel("")
-    plt.title("Validation MAE by forecast model")
+    plt.title(plot_text("Validation MAE by forecast model"))
+    plt.legend(title="")
     save_figure(root_dir / "fig_combined_scenario_valid_mae.png")
 
 
-# =============================================================================
-# 8. MAIN
-# =============================================================================
+# Main
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options."""
     parser = argparse.ArgumentParser(description="Run forecast-only improved XGBoost homelessness models on the latest integrated monthly panel.")
     parser.add_argument("--monthly", type=str, default=DEFAULT_MONTHLY_FILE, help="Path to latest integrated monthly LAD panel CSV")
     parser.add_argument("--output", type=str, default=str(OUTPUT_DIR), help="Output folder")
@@ -1606,6 +1775,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the full modelling pipeline."""
     global OUTPUT_DIR, SHOW_PLOTS, TOP_K_FEATURES, ADD_LAD_DUMMIES, FORCE_KEEP_LAD_DUMMIES
     args = parse_args()
     OUTPUT_DIR = Path(args.output)
@@ -1637,7 +1807,7 @@ def main() -> None:
     print(panel_type_report["explicit_type"].value_counts().to_string())
     print(f"Saved all-column type report: {OUTPUT_DIR / 'engineered_panel_column_types.csv'}")
 
-    # Forecast-only: nowcasting has been removed.
+    # Single forecast scenario for the report.
     scenarios: List[Tuple[str, bool]] = [("lagged_only_no_same_quarter_exog_forecast", False)]
 
     all_metrics: List[pd.DataFrame] = []
@@ -1673,7 +1843,7 @@ def main() -> None:
 
     combined_metrics = pd.concat(all_metrics, ignore_index=True)
     scenario_summary_df = pd.DataFrame(scenario_summaries)
-    # Keep previous filenames for compatibility, and also save forecast-only aliases.
+    # Keep old filenames alongside forecast-only aliases.
     combined_metrics.to_csv(OUTPUT_DIR / "combined_scenario_metrics_all_splits.csv", index=False)
     scenario_summary_df.to_csv(OUTPUT_DIR / "combined_scenario_model_summaries.csv", index=False)
     combined_metrics.to_csv(OUTPUT_DIR / "forecast_metrics_all_splits.csv", index=False)

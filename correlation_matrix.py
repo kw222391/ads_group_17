@@ -1,7 +1,27 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-file_path = r"D:\UOB\ads_group_17\ads_group_17\data\clean\Final all Junxi\monthly_lad_panel_2000_2025_replaced_homelessness_final.csv"
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
+    "font.size": 24,
+    "legend.fontsize": 19
+})
+
+
+def latex_label(label):
+    return label.replace("_", r" ")
+
+
+TICK_LABEL_SIZE = 16
+TITLE_PAD = 24
+COLORBAR_LABEL_PAD = 18
+
+
+base_dir = Path(__file__).resolve().parent
+file_path = base_dir / "data" / "clean" / "Final all Junxi.gz"
 
 df = pd.read_csv(file_path)
 
@@ -80,21 +100,25 @@ plt.imshow(
     aspect="auto"
 )
 
-plt.colorbar(label="Pearson correlation")
+cbar = plt.colorbar()
+cbar.set_label("Pearson correlation", labelpad=COLORBAR_LABEL_PAD)
 
 plt.xticks(
     ticks=range(len(corr_matrix.columns)),
-    labels=corr_matrix.columns,
+    labels=[latex_label(col) for col in corr_matrix.columns],
     rotation=90,
-    fontsize=8
+    fontsize=TICK_LABEL_SIZE
 )
 
 plt.yticks(
     ticks=range(len(corr_matrix.index)),
-    labels=corr_matrix.index,
-    fontsize=8
+    labels=[latex_label(index) for index in corr_matrix.index],
+    fontsize=TICK_LABEL_SIZE
 )
 
-plt.title("Correlation Matrix: Homelessness Target and Economic Features After 2018")
+plt.title(
+    "Correlation Matrix: Homelessness Target and Economic Features After 2018",
+    pad=TITLE_PAD
+)
 plt.tight_layout()
 plt.show()

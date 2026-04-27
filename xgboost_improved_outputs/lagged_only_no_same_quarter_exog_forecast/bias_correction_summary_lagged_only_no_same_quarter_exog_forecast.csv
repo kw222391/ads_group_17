@@ -1,3 +1,3 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3c9124de6db56661f75565f2bcd39358b98c7527f979c515751fd2134973c405
-size 425
+model_name,method,intercept,slope,valid_MAE,valid_RMSE,valid_bias_actual_minus_predicted,n_valid_for_correction
+Growth-from-lag1 XGBoost raw,linear_validation_calibration,9.434977159292828,0.934925573246341,35.26499698368409,62.276732643561246,1.8715521446290553e-14,1142
+Unrestricted XGBoost-bc + lag1 blend,additive_mean_residual,-1.0129597197898266,1.0,34.97267185818507,61.704789526470684,-1.991012919818144e-15,1142

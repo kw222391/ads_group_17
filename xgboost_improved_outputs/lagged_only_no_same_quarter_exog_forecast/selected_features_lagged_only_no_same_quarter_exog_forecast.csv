@@ -1,3 +1,428 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:b2697ef23b1560a352ca6ac08f58984bb447c52b0f10a73339308399382be2c7
-size 18644
+feature,group
+average_house_price_lag1q,house price / housing
+average_house_price_lag2q,house price / housing
+average_house_price_lag4q,house price / housing
+average_house_price_lag8q,house price / housing
+average_house_price_monthly_change_lag1q,house price / housing
+average_house_price_monthly_change_lag2q,house price / housing
+average_house_price_monthly_change_lag4q,house price / housing
+average_house_price_monthly_change_lag8q,house price / housing
+average_house_price_annual_change_lag1q,house price / housing
+average_house_price_annual_change_lag8q,house price / housing
+house_price_index_lag1q,house price / housing
+house_price_index_lag2q,house price / housing
+house_price_index_lag4q,house price / housing
+house_price_index_lag8q,house price / housing
+house_sales_volume_lag1q,house price / housing
+house_sales_volume_lag2q,house price / housing
+house_sales_volume_lag4q,house price / housing
+house_sales_volume_lag8q,house price / housing
+unemployment_count_lag1q,unemployment
+unemployment_count_lag2q,unemployment
+unemployment_count_lag4q,unemployment
+unemployment_count_lag8q,unemployment
+private_rental_price_index_lag1q,rent
+private_rental_price_index_lag2q,rent
+private_rental_price_index_lag4q,rent
+private_rental_price_index_lag8q,rent
+private_rental_price_monthly_change_lag1q,rent
+private_rental_price_monthly_change_lag2q,rent
+private_rental_price_monthly_change_lag4q,rent
+average_private_rental_price_lag1q,rent
+average_private_rental_price_lag2q,rent
+average_private_rental_price_lag4q,rent
+average_private_rental_price_lag8q,rent
+gbp_index_lag1q,market / FX
+gbp_index_lag2q,market / FX
+gbp_index_lag4q,market / FX
+gbp_index_lag8q,market / FX
+ftse_100_lag1q,market / FX
+ftse_100_lag2q,market / FX
+ftse_100_lag4q,market / FX
+ftse_100_lag8q,market / FX
+income_lag1q,income / affordability
+income_lag2q,income / affordability
+income_lag4q,income / affordability
+income_lag8q,income / affordability
+uk_bank_rate_lag1q,interest rate
+uk_bank_rate_lag2q,interest rate
+uk_bank_rate_lag4q,interest rate
+uk_bank_rate_lag8q,interest rate
+brent_oil_price_lag1q,oil / energy proxy
+brent_oil_price_lag2q,oil / energy proxy
+brent_oil_price_lag4q,oil / energy proxy
+brent_oil_price_lag8q,oil / energy proxy
+population_lag4q,population / scale
+internal_net_migration_lag1q,migration
+internal_net_migration_lag2q,migration
+internal_net_migration_lag4q,migration
+internal_net_migration_lag8q,migration
+international_net_migration_lag1q,migration
+international_net_migration_lag2q,migration
+international_net_migration_lag4q,migration
+international_net_migration_lag8q,migration
+cpi_00_all_items_lag1q,CPI total
+cpi_00_all_items_lag2q,CPI total
+cpi_00_all_items_lag4q,CPI total
+cpi_00_all_items_lag8q,CPI total
+house_price_to_income_lag1q,house price / housing
+house_price_to_income_lag2q,house price / housing
+house_price_to_income_lag4q,house price / housing
+house_price_to_income_lag8q,house price / housing
+annual_rent_to_income_lag1q,rent
+annual_rent_to_income_lag2q,rent
+annual_rent_to_income_lag4q,rent
+annual_rent_to_income_lag8q,rent
+unemployment_per_1000_lag1q,unemployment
+unemployment_per_1000_lag2q,unemployment
+unemployment_per_1000_lag4q,unemployment
+unemployment_per_1000_lag8q,unemployment
+log1p_average_house_price_lag1q,house price / housing
+log1p_average_house_price_lag2q,house price / housing
+log1p_average_house_price_lag4q,house price / housing
+log1p_average_house_price_lag8q,house price / housing
+log1p_house_price_index_lag1q,house price / housing
+log1p_house_price_index_lag2q,house price / housing
+log1p_house_price_index_lag4q,house price / housing
+log1p_house_price_index_lag8q,house price / housing
+log1p_house_sales_volume_lag1q,house price / housing
+log1p_house_sales_volume_lag2q,house price / housing
+log1p_house_sales_volume_lag4q,house price / housing
+log1p_house_sales_volume_lag8q,house price / housing
+log1p_unemployment_count_lag1q,unemployment
+log1p_unemployment_count_lag2q,unemployment
+log1p_unemployment_count_lag4q,unemployment
+log1p_unemployment_count_lag8q,unemployment
+log1p_private_rental_price_index_lag1q,rent
+log1p_private_rental_price_index_lag2q,rent
+log1p_private_rental_price_index_lag4q,rent
+log1p_private_rental_price_index_lag8q,rent
+log1p_average_private_rental_price_lag1q,rent
+log1p_average_private_rental_price_lag2q,rent
+log1p_average_private_rental_price_lag4q,rent
+log1p_average_private_rental_price_lag8q,rent
+log1p_income_lag1q,income / affordability
+log1p_income_lag2q,income / affordability
+log1p_income_lag4q,income / affordability
+log1p_income_lag8q,income / affordability
+log1p_brent_oil_price_lag1q,oil / energy proxy
+log1p_brent_oil_price_lag2q,oil / energy proxy
+log1p_brent_oil_price_lag4q,oil / energy proxy
+log1p_brent_oil_price_lag8q,oil / energy proxy
+log1p_population_lag4q,population / scale
+log1p_cpi_00_all_items_lag1q,CPI total
+log1p_cpi_00_all_items_lag2q,CPI total
+log1p_cpi_00_all_items_lag4q,CPI total
+log1p_cpi_00_all_items_lag8q,CPI total
+log1p_house_price_to_income_lag1q,house price / housing
+log1p_house_price_to_income_lag2q,house price / housing
+log1p_house_price_to_income_lag4q,house price / housing
+log1p_house_price_to_income_lag8q,house price / housing
+log1p_annual_rent_to_income_lag1q,rent
+log1p_annual_rent_to_income_lag2q,rent
+log1p_annual_rent_to_income_lag4q,rent
+log1p_annual_rent_to_income_lag8q,rent
+log1p_unemployment_per_1000_lag1q,unemployment
+log1p_unemployment_per_1000_lag2q,unemployment
+log1p_unemployment_per_1000_lag4q,unemployment
+log1p_unemployment_per_1000_lag8q,unemployment
+average_house_price_qoq_pct_lag4q,house price / housing
+average_house_price_qoq_pct_lag8q,house price / housing
+average_house_price_monthly_change_qoq_pct_lag1q,house price / housing
+average_house_price_monthly_change_qoq_pct_lag2q,house price / housing
+average_house_price_monthly_change_qoq_pct_lag4q,house price / housing
+average_house_price_monthly_change_qoq_pct_lag8q,house price / housing
+average_house_price_monthly_change_yoy_pct_lag1q,house price / housing
+average_house_price_monthly_change_yoy_pct_lag2q,house price / housing
+average_house_price_monthly_change_yoy_pct_lag4q,house price / housing
+average_house_price_monthly_change_yoy_pct_lag8q,house price / housing
+average_house_price_annual_change_qoq_pct_lag1q,house price / housing
+average_house_price_annual_change_qoq_pct_lag2q,house price / housing
+average_house_price_annual_change_qoq_pct_lag4q,house price / housing
+average_house_price_annual_change_qoq_pct_lag8q,house price / housing
+average_house_price_annual_change_yoy_pct_lag1q,house price / housing
+average_house_price_annual_change_yoy_pct_lag2q,house price / housing
+average_house_price_annual_change_yoy_pct_lag4q,house price / housing
+average_house_price_annual_change_yoy_pct_lag8q,house price / housing
+house_price_index_qoq_pct_lag2q,house price / housing
+house_price_index_yoy_pct_lag2q,house price / housing
+house_price_index_yoy_pct_lag4q,house price / housing
+house_sales_volume_qoq_pct_lag1q,house price / housing
+house_sales_volume_qoq_pct_lag2q,house price / housing
+house_sales_volume_qoq_pct_lag4q,house price / housing
+house_sales_volume_qoq_pct_lag8q,house price / housing
+house_sales_volume_yoy_pct_lag1q,house price / housing
+house_sales_volume_yoy_pct_lag2q,house price / housing
+house_sales_volume_yoy_pct_lag4q,house price / housing
+house_sales_volume_yoy_pct_lag8q,house price / housing
+unemployment_count_yoy_pct_lag2q,unemployment
+unemployment_count_yoy_pct_lag4q,unemployment
+unemployment_count_yoy_pct_lag8q,unemployment
+private_rental_price_index_qoq_pct_lag1q,rent
+private_rental_price_index_qoq_pct_lag4q,rent
+private_rental_price_index_qoq_pct_lag8q,rent
+private_rental_price_index_yoy_pct_lag1q,rent
+private_rental_price_index_yoy_pct_lag2q,rent
+private_rental_price_monthly_change_qoq_pct_lag1q,rent
+private_rental_price_monthly_change_qoq_pct_lag2q,rent
+private_rental_price_monthly_change_qoq_pct_lag4q,rent
+private_rental_price_monthly_change_qoq_pct_lag8q,rent
+private_rental_price_monthly_change_yoy_pct_lag1q,rent
+private_rental_price_monthly_change_yoy_pct_lag2q,rent
+private_rental_price_monthly_change_yoy_pct_lag4q,rent
+private_rental_price_monthly_change_yoy_pct_lag8q,rent
+private_rental_price_annual_change_qoq_pct_lag1q,rent
+private_rental_price_annual_change_qoq_pct_lag2q,rent
+private_rental_price_annual_change_qoq_pct_lag4q,rent
+private_rental_price_annual_change_qoq_pct_lag8q,rent
+private_rental_price_annual_change_yoy_pct_lag1q,rent
+private_rental_price_annual_change_yoy_pct_lag2q,rent
+private_rental_price_annual_change_yoy_pct_lag4q,rent
+private_rental_price_annual_change_yoy_pct_lag8q,rent
+average_private_rental_price_qoq_pct_lag2q,rent
+average_private_rental_price_yoy_pct_lag4q,rent
+average_private_rental_price_yoy_pct_lag8q,rent
+gbp_index_qoq_pct_lag1q,market / FX
+gbp_index_qoq_pct_lag2q,market / FX
+gbp_index_qoq_pct_lag4q,market / FX
+gbp_index_qoq_pct_lag8q,market / FX
+gbp_index_yoy_pct_lag1q,market / FX
+gbp_index_yoy_pct_lag2q,market / FX
+gbp_index_yoy_pct_lag4q,market / FX
+gbp_index_yoy_pct_lag8q,market / FX
+ftse_100_qoq_pct_lag1q,market / FX
+ftse_100_qoq_pct_lag2q,market / FX
+ftse_100_qoq_pct_lag4q,market / FX
+ftse_100_qoq_pct_lag8q,market / FX
+ftse_100_yoy_pct_lag1q,market / FX
+ftse_100_yoy_pct_lag4q,market / FX
+ftse_100_yoy_pct_lag8q,market / FX
+income_qoq_pct_lag1q,income / affordability
+income_qoq_pct_lag2q,income / affordability
+income_qoq_pct_lag4q,income / affordability
+income_qoq_pct_lag8q,income / affordability
+income_yoy_pct_lag1q,income / affordability
+income_yoy_pct_lag2q,income / affordability
+income_yoy_pct_lag4q,income / affordability
+income_yoy_pct_lag8q,income / affordability
+uk_bank_rate_qoq_pct_lag2q,interest rate
+uk_bank_rate_qoq_pct_lag4q,interest rate
+uk_bank_rate_qoq_pct_lag8q,interest rate
+uk_bank_rate_yoy_pct_lag1q,interest rate
+uk_bank_rate_yoy_pct_lag2q,interest rate
+uk_bank_rate_yoy_pct_lag4q,interest rate
+uk_bank_rate_yoy_pct_lag8q,interest rate
+brent_oil_price_qoq_pct_lag1q,oil / energy proxy
+brent_oil_price_qoq_pct_lag2q,oil / energy proxy
+brent_oil_price_qoq_pct_lag4q,oil / energy proxy
+brent_oil_price_qoq_pct_lag8q,oil / energy proxy
+brent_oil_price_yoy_pct_lag1q,oil / energy proxy
+brent_oil_price_yoy_pct_lag2q,oil / energy proxy
+brent_oil_price_yoy_pct_lag4q,oil / energy proxy
+brent_oil_price_yoy_pct_lag8q,oil / energy proxy
+population_qoq_pct_lag1q,population / scale
+population_qoq_pct_lag2q,population / scale
+population_qoq_pct_lag4q,population / scale
+population_qoq_pct_lag8q,population / scale
+population_yoy_pct_lag1q,population / scale
+population_yoy_pct_lag2q,population / scale
+population_yoy_pct_lag8q,population / scale
+internal_net_migration_qoq_pct_lag1q,migration
+internal_net_migration_qoq_pct_lag2q,migration
+internal_net_migration_qoq_pct_lag4q,migration
+internal_net_migration_qoq_pct_lag8q,migration
+internal_net_migration_yoy_pct_lag2q,migration
+internal_net_migration_yoy_pct_lag4q,migration
+internal_net_migration_yoy_pct_lag8q,migration
+international_net_migration_qoq_pct_lag1q,migration
+international_net_migration_qoq_pct_lag2q,migration
+international_net_migration_qoq_pct_lag4q,migration
+international_net_migration_qoq_pct_lag8q,migration
+international_net_migration_yoy_pct_lag1q,migration
+international_net_migration_yoy_pct_lag2q,migration
+international_net_migration_yoy_pct_lag4q,migration
+international_net_migration_yoy_pct_lag8q,migration
+cpi_00_all_items_qoq_pct_lag1q,CPI total
+cpi_00_all_items_qoq_pct_lag2q,CPI total
+cpi_00_all_items_qoq_pct_lag4q,CPI total
+cpi_00_all_items_qoq_pct_lag8q,CPI total
+cpi_00_all_items_yoy_pct_lag1q,CPI total
+cpi_00_all_items_yoy_pct_lag2q,CPI total
+cpi_00_all_items_yoy_pct_lag8q,CPI total
+house_price_to_income_qoq_pct_lag1q,house price / housing
+house_price_to_income_qoq_pct_lag2q,house price / housing
+house_price_to_income_qoq_pct_lag4q,house price / housing
+house_price_to_income_qoq_pct_lag8q,house price / housing
+house_price_to_income_yoy_pct_lag1q,house price / housing
+house_price_to_income_yoy_pct_lag2q,house price / housing
+house_price_to_income_yoy_pct_lag4q,house price / housing
+house_price_to_income_yoy_pct_lag8q,house price / housing
+annual_rent_to_income_qoq_pct_lag1q,rent
+annual_rent_to_income_qoq_pct_lag2q,rent
+annual_rent_to_income_qoq_pct_lag4q,rent
+annual_rent_to_income_qoq_pct_lag8q,rent
+annual_rent_to_income_yoy_pct_lag1q,rent
+annual_rent_to_income_yoy_pct_lag2q,rent
+annual_rent_to_income_yoy_pct_lag4q,rent
+annual_rent_to_income_yoy_pct_lag8q,rent
+unemployment_per_1000_qoq_pct_lag1q,unemployment
+unemployment_per_1000_qoq_pct_lag2q,unemployment
+unemployment_per_1000_qoq_pct_lag4q,unemployment
+unemployment_per_1000_qoq_pct_lag8q,unemployment
+unemployment_per_1000_yoy_pct_lag1q,unemployment
+homelessness_per_1000_lag1q,target history
+homelessness_relief_lag1q,target history
+log1p_homelessness_relief_lag1q,target history
+homelessness_total_assessments_lag2q,target history
+log1p_homelessness_total_assessments_lag2q,target history
+computed_homelessness_rate_per_1000_lag2q,target history
+log1p_computed_homelessness_rate_per_1000_lag2q,target history
+homelessness_per_1000_lag2q,target history
+homelessness_relief_lag2q,target history
+log1p_homelessness_relief_lag2q,target history
+homelessness_total_assessments_lag4q,target history
+log1p_homelessness_total_assessments_lag4q,target history
+computed_homelessness_rate_per_1000_lag4q,target history
+log1p_computed_homelessness_rate_per_1000_lag4q,target history
+homelessness_per_1000_lag4q,target history
+homelessness_relief_lag4q,target history
+log1p_homelessness_relief_lag4q,target history
+homelessness_total_assessments_lag8q,target history
+computed_homelessness_rate_per_1000_lag8q,target history
+log1p_computed_homelessness_rate_per_1000_lag8q,target history
+homelessness_per_1000_lag8q,target history
+homelessness_relief_lag8q,target history
+homelessness_total_assessments_rolling4_mean_lag1q,target history
+homelessness_total_assessments_rolling4_std_lag1q,target history
+homelessness_total_assessments_rolling8_mean_lag1q,target history
+homelessness_total_assessments_rolling8_std_lag1q,target history
+target_log_growth_lag1q,target history
+target_log_growth_lag4q,target history
+year,time / policy
+quarter_num,time / policy
+quarter_index,time / policy
+quarter_sin,time / policy
+quarter_cos,time / policy
+post_covid_2020plus,time / policy
+cost_of_living_shock_2022plus,time / policy
+lad_E06000001,LAD fixed effect
+lad_E06000006,LAD fixed effect
+lad_E06000008,LAD fixed effect
+lad_E06000013,LAD fixed effect
+lad_E06000014,LAD fixed effect
+lad_E06000019,LAD fixed effect
+lad_E06000020,LAD fixed effect
+lad_E06000022,LAD fixed effect
+lad_E06000024,LAD fixed effect
+lad_E06000025,LAD fixed effect
+lad_E06000027,LAD fixed effect
+lad_E06000030,LAD fixed effect
+lad_E06000031,LAD fixed effect
+lad_E06000033,LAD fixed effect
+lad_E06000034,LAD fixed effect
+lad_E06000035,LAD fixed effect
+lad_E06000036,LAD fixed effect
+lad_E06000039,LAD fixed effect
+lad_E06000041,LAD fixed effect
+lad_E06000043,LAD fixed effect
+lad_E06000046,LAD fixed effect
+lad_E06000053,LAD fixed effect
+lad_E06000057,LAD fixed effect
+lad_E06000059,LAD fixed effect
+lad_E06000060,LAD fixed effect
+lad_E06000061,LAD fixed effect
+lad_E06000063,LAD fixed effect
+lad_E06000064,LAD fixed effect
+lad_E06000065,LAD fixed effect
+lad_E06000066,LAD fixed effect
+lad_E07000005,LAD fixed effect
+lad_E07000006,LAD fixed effect
+lad_E07000009,LAD fixed effect
+lad_E07000027,LAD fixed effect
+lad_E07000029,LAD fixed effect
+lad_E07000031,LAD fixed effect
+lad_E07000033,LAD fixed effect
+lad_E07000035,LAD fixed effect
+lad_E07000037,LAD fixed effect
+lad_E07000039,LAD fixed effect
+lad_E07000043,LAD fixed effect
+lad_E07000044,LAD fixed effect
+lad_E07000047,LAD fixed effect
+lad_E07000061,LAD fixed effect
+lad_E07000064,LAD fixed effect
+lad_E07000065,LAD fixed effect
+lad_E07000066,LAD fixed effect
+lad_E07000071,LAD fixed effect
+lad_E07000074,LAD fixed effect
+lad_E07000075,LAD fixed effect
+lad_E07000084,LAD fixed effect
+lad_E07000087,LAD fixed effect
+lad_E07000091,LAD fixed effect
+lad_E07000092,LAD fixed effect
+lad_E07000103,LAD fixed effect
+lad_E07000105,LAD fixed effect
+lad_E07000108,LAD fixed effect
+lad_E07000109,LAD fixed effect
+lad_E07000112,LAD fixed effect
+lad_E07000113,LAD fixed effect
+lad_E07000115,LAD fixed effect
+lad_E07000116,LAD fixed effect
+lad_E07000118,LAD fixed effect
+lad_E07000120,LAD fixed effect
+lad_E07000121,LAD fixed effect
+lad_E07000126,LAD fixed effect
+lad_E07000133,LAD fixed effect
+lad_E07000136,LAD fixed effect
+lad_E07000137,LAD fixed effect
+lad_E07000140,LAD fixed effect
+lad_E07000143,LAD fixed effect
+lad_E07000145,LAD fixed effect
+lad_E07000150,LAD fixed effect
+lad_E07000152,LAD fixed effect
+lad_E07000153,LAD fixed effect
+lad_E07000155,LAD fixed effect
+lad_E07000156,LAD fixed effect
+lad_E07000164,LAD fixed effect
+lad_E07000172,LAD fixed effect
+lad_E07000174,LAD fixed effect
+lad_E07000175,LAD fixed effect
+lad_E07000176,LAD fixed effect
+lad_E07000180,LAD fixed effect
+lad_E07000187,LAD fixed effect
+lad_E07000188,LAD fixed effect
+lad_E07000193,LAD fixed effect
+lad_E07000194,LAD fixed effect
+lad_E07000196,LAD fixed effect
+lad_E07000197,LAD fixed effect
+lad_E07000208,LAD fixed effect
+lad_E07000212,LAD fixed effect
+lad_E07000214,LAD fixed effect
+lad_E07000220,LAD fixed effect
+lad_E07000225,LAD fixed effect
+lad_E07000227,LAD fixed effect
+lad_E07000239,LAD fixed effect
+lad_E07000244,LAD fixed effect
+lad_E07000246,LAD fixed effect
+lad_E08000004,LAD fixed effect
+lad_E08000005,LAD fixed effect
+lad_E08000009,LAD fixed effect
+lad_E08000010,LAD fixed effect
+lad_E08000012,LAD fixed effect
+lad_E08000026,LAD fixed effect
+lad_E08000028,LAD fixed effect
+lad_E08000030,LAD fixed effect
+lad_E08000031,LAD fixed effect
+lad_E08000037,LAD fixed effect
+lad_E09000001,LAD fixed effect
+lad_E09000008,LAD fixed effect
+lad_E09000014,LAD fixed effect
+lad_E09000015,LAD fixed effect
+lad_E09000017,LAD fixed effect
+lad_E09000018,LAD fixed effect
+lad_E09000019,LAD fixed effect
+lad_E09000021,LAD fixed effect
+lad_E09000026,LAD fixed effect
+lad_E09000027,LAD fixed effect
+lad_E09000030,LAD fixed effect
+lad_E09000032,LAD fixed effect
+lad_E09000033,LAD fixed effect

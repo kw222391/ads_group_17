@@ -1,3 +1,15 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:7e8b33c651e245c8750452b0e76ce098292b2d5b2aea30c4fe1d825b45c5ff9f
-size 576
+component,share
+lag-1 baseline,0.19999999999999996
+XGB: house price / housing,0.18852212946376917
+XGB: rent,0.12778339674006556
+XGB: oil / energy proxy,0.0824774353676418
+XGB: target history,0.08058771423056971
+XGB: market / FX,0.06937476538335118
+XGB: population / scale,0.06191566254661392
+XGB: migration,0.055943180067575884
+XGB: income / affordability,0.037335192324557
+XGB: time / policy,0.03421708972254924
+XGB: unemployment,0.024452982635788458
+XGB: CPI total,0.016964658347790252
+XGB: interest rate,0.013681688038519511
+XGB: LAD fixed effect,0.006744105131208381
