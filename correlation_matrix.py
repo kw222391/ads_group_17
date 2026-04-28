@@ -6,18 +6,49 @@ plt.rcParams.update({
     "text.usetex": True,
     "font.family": "serif",
     "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
-    "font.size": 24,
+    "font.size": 50,
     "legend.fontsize": 19
 })
 
 
+DISPLAY_LABELS = {
+    "homelessness_total_assessments": "Homelessness",
+    "average_house_price": "House price",
+    "average_house_price_monthly_change": "House price MoM",
+    "house_price_index": "HPI",
+    "house_sales_volume": "Sales volume",
+    "unemployment_count": "Unemployment",
+    "private_rental_price_index": "Rent index",
+    "private_rental_price_monthly_change": "Rent MoM",
+    "average_private_rental_price": "Avg. rent",
+    "gbp_index": "GBP index",
+    "ftse_100": "FTSE 100",
+    "income": "Income",
+    "uk_bank_rate": "Bank rate",
+    "brent_oil_price": "Brent oil",
+    "population": "Population",
+    "internal_net_migration": "Internal mig.",
+    "international_net_migration": "Intl. mig.",
+    "cpitotal": "CPI",
+}
+
+
 def latex_label(label):
-    return label.replace("_", r" ")
+    return DISPLAY_LABELS.get(label, label).replace("_", " ")
 
 
-TICK_LABEL_SIZE = 16
-TITLE_PAD = 24
-COLORBAR_LABEL_PAD = 18
+def plot_labels(labels):
+    return [latex_label(label) for label in labels]
+
+
+
+FIGURE_SIZE = (18, 16)
+TICK_LABEL_SIZE = 28
+TITLE_SIZE = 34
+TITLE_PAD = 26
+COLORBAR_TICK_SIZE = 24
+COLORBAR_LABEL_SIZE = 30
+COLORBAR_LABEL_PAD = 22
 
 
 base_dir = Path(__file__).resolve().parent
@@ -32,14 +63,11 @@ target = "homelessness_total_assessments"
 features = [
     "average_house_price",
     "average_house_price_monthly_change",
-    "average_house_price_annual_change",
-    "seasonally_adjusted_average_house_price",
     "house_price_index",
     "house_sales_volume",
     "unemployment_count",
     "private_rental_price_index",
     "private_rental_price_monthly_change",
-    "private_rental_price_annual_change",
     "average_private_rental_price",
     "gbp_index",
     "ftse_100",
@@ -91,7 +119,7 @@ print(target_corr)
 print("\nFull correlation matrix:")
 print(corr_matrix)
 
-plt.figure(figsize=(16, 14))
+plt.figure(figsize=FIGURE_SIZE)
 
 plt.imshow(
     corr_matrix.values,
@@ -101,24 +129,35 @@ plt.imshow(
 )
 
 cbar = plt.colorbar()
-cbar.set_label("Pearson correlation", labelpad=COLORBAR_LABEL_PAD)
+cbar.ax.tick_params(labelsize=COLORBAR_TICK_SIZE)
+cbar.set_label(
+    "Pearson correlation",
+    fontsize=COLORBAR_LABEL_SIZE,
+    labelpad=COLORBAR_LABEL_PAD
+)
 
 plt.xticks(
     ticks=range(len(corr_matrix.columns)),
-    labels=[latex_label(col) for col in corr_matrix.columns],
+    labels=plot_labels(corr_matrix.columns),
     rotation=90,
     fontsize=TICK_LABEL_SIZE
 )
 
 plt.yticks(
     ticks=range(len(corr_matrix.index)),
-    labels=[latex_label(index) for index in corr_matrix.index],
+    labels=plot_labels(corr_matrix.index),
     fontsize=TICK_LABEL_SIZE
 )
 
 plt.title(
-    "Correlation Matrix: Homelessness Target and Economic Features After 2018",
+    "Correlation Matrix: Homelessness Target and\nEconomic Features After 2018",
+    fontsize=TITLE_SIZE,
     pad=TITLE_PAD
 )
 plt.tight_layout()
+
+output_pdf = base_dir / "correlation_matrix.pdf"
+plt.savefig(output_pdf, format="pdf", bbox_inches="tight")
+print(f"\nSaved PDF figure to: {output_pdf}")
+
 plt.show()

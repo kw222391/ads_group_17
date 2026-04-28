@@ -90,6 +90,22 @@ QUICK_XGB_EARLY_STOPPING_ROUNDS = 50
 SAVE_PLOTS = True
 SHOW_PLOTS = True
 
+IEEE_COLUMN_WIDTH = 3.45
+IEEE_TEXT_WIDTH = 7.16
+FIG_SINGLE = (IEEE_COLUMN_WIDTH, 2.35)
+FIG_SINGLE_SQUARE = (IEEE_COLUMN_WIDTH, 3.05)
+FIG_SINGLE_TIMELINE = (IEEE_COLUMN_WIDTH, 2.55)
+FIG_SINGLE_TALL = (IEEE_COLUMN_WIDTH, 3.75)
+FIG_DOUBLE = (IEEE_TEXT_WIDTH, 3.2)
+FIG_DOUBLE_TALL = (IEEE_TEXT_WIDTH, 4.2)
+FIG_DOUBLE_EXTRA_TALL = (IEEE_TEXT_WIDTH, 4.8)
+
+IEEE_BASE_FONT = 8
+IEEE_TITLE_FONT = 9
+IEEE_AXIS_FONT = 8
+IEEE_TICK_FONT = 7
+IEEE_LEGEND_FONT = 7
+
 ACADEMIC_COLORS = {
     "blue": "#0072B2",
     "sky": "#56B4E9",
@@ -134,24 +150,45 @@ PLOT_MODEL_LABELS = {
     "Growth-from-lag1 XGBoost + bias correction": "XGBoost",
     "Final blend + bias correction": "Blend",
 }
+FEATURE_GROUP_LABELS = {
+    "house price / housing": "Housing",
+    "rent": "Rent",
+    "oil / energy proxy": "Oil/energy",
+    "target history": "Target hist.",
+    "market / FX": "Market/FX",
+    "population / scale": "Population",
+    "migration": "Migration",
+    "income / affordability": "Income",
+    "time / policy": "Time",
+    "unemployment": "Unemployment",
+    "CPI total": "CPI",
+    "interest rate": "Rate",
+    "LAD fixed effect": "LAD FE",
+}
 
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "serif",
     "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
-    "font.size": 13,
-    "axes.titlesize": 16,
-    "axes.labelsize": 14,
-    "xtick.labelsize": 11,
-    "ytick.labelsize": 11,
-    "legend.fontsize": 11,
-    "figure.titlesize": 16,
-    "axes.linewidth": 0.8,
+    "font.size": IEEE_BASE_FONT,
+    "axes.titlesize": IEEE_TITLE_FONT,
+    "axes.labelsize": IEEE_AXIS_FONT,
+    "xtick.labelsize": IEEE_TICK_FONT,
+    "ytick.labelsize": IEEE_TICK_FONT,
+    "legend.fontsize": IEEE_LEGEND_FONT,
+    "figure.titlesize": IEEE_TITLE_FONT,
+    "axes.linewidth": 0.5,
     "axes.edgecolor": ACADEMIC_COLORS["black"],
     "axes.labelcolor": ACADEMIC_COLORS["black"],
     "xtick.color": ACADEMIC_COLORS["black"],
     "ytick.color": ACADEMIC_COLORS["black"],
     "axes.unicode_minus": False,
+    "lines.linewidth": 1.0,
+    "lines.markersize": 3.0,
+    "patch.linewidth": 0.4,
+    "savefig.dpi": 300,
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
 })
 
 sns.set_theme(
@@ -162,17 +199,17 @@ sns.set_theme(
         "text.usetex": True,
         "font.family": "serif",
         "font.serif": ["Times New Roman", "Times", "Palatino", "serif"],
-        "font.size": 13,
-        "axes.titlesize": 16,
-        "axes.labelsize": 14,
-        "xtick.labelsize": 11,
-        "ytick.labelsize": 11,
-        "legend.fontsize": 11,
-        "figure.titlesize": 16,
-        "axes.linewidth": 0.8,
+        "font.size": IEEE_BASE_FONT,
+        "axes.titlesize": IEEE_TITLE_FONT,
+        "axes.labelsize": IEEE_AXIS_FONT,
+        "xtick.labelsize": IEEE_TICK_FONT,
+        "ytick.labelsize": IEEE_TICK_FONT,
+        "legend.fontsize": IEEE_LEGEND_FONT,
+        "figure.titlesize": IEEE_TITLE_FONT,
+        "axes.linewidth": 0.5,
         "axes.grid": True,
         "grid.color": "#E5E7EB",
-        "grid.linewidth": 0.7,
+        "grid.linewidth": 0.35,
         "axes.spines.top": False,
         "axes.spines.right": False,
     },
@@ -240,8 +277,11 @@ def midpoint_time(start: pd.Timestamp, end: pd.Timestamp) -> pd.Timestamp:
 
 def polish_axes(ax: plt.Axes) -> None:
     """Apply the shared report-figure axis style."""
-    ax.grid(True, axis="y", color="#E5E7EB", linewidth=0.7)
+    ax.grid(True, axis="y", color="#E5E7EB", linewidth=0.35)
     ax.grid(False, axis="x")
+    ax.tick_params(axis="both", which="major", labelsize=IEEE_TICK_FONT, width=0.5, length=2.5)
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.5)
     sns.despine(ax=ax)
 
 
@@ -343,12 +383,14 @@ def ensure_numeric_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def save_figure(path: Path) -> None:
-    """Save the current figure and optionally show it interactively."""
+    """Save the current figure as PNG and PDF, then optionally show it."""
     for ax in plt.gcf().axes:
         polish_axes(ax)
     if SAVE_PLOTS:
         plt.tight_layout(pad=0.4)
         plt.savefig(path, dpi=300, bbox_inches="tight")
+        if path.suffix.lower() != ".pdf":
+            plt.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
     if SHOW_PLOTS:
         plt.show(block=False)
         plt.pause(0.1)
@@ -1567,14 +1609,14 @@ def make_report_plots(
 
     # Test MAE.
     test_metrics["model_display"] = test_metrics["model"].astype(str).map(model_plot_label)
-    plt.figure(figsize=(10, 5.5))
+    plt.figure(figsize=FIG_SINGLE)
     ax = sns.barplot(
         data=test_metrics,
         x="model_display",
         y="MAE",
         color=ACADEMIC_COLORS["blue"],
         edgecolor=ACADEMIC_COLORS["black"],
-        linewidth=0.6,
+        linewidth=0.4,
     )
     ax.set_ylabel(plot_text("Test MAE"))
     plt.xlabel("")
@@ -1585,7 +1627,7 @@ def make_report_plots(
     # Actual vs predicted.
     test_pred = pred_df[pred_df["split"] == "test"].copy()
     test_pred["final_pred"] = test_pred[final_pred_col]
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=FIG_SINGLE_SQUARE)
     sns.scatterplot(
         data=test_pred,
         x=TARGET_COL,
@@ -1593,13 +1635,14 @@ def make_report_plots(
         alpha=0.55,
         color=ACADEMIC_COLORS["blue"],
         edgecolor="white",
-        linewidth=0.25,
+        linewidth=0.15,
+        s=12,
     )
     max_val = np.nanmax([test_pred[TARGET_COL].max(), test_pred["final_pred"].max()])
-    plt.plot([0, max_val], [0, max_val], linestyle="--", linewidth=1, color=ACADEMIC_COLORS["red"])
+    plt.plot([0, max_val], [0, max_val], linestyle="--", linewidth=0.8, color=ACADEMIC_COLORS["red"])
     plt.xlabel(plot_text("Actual homelessness assessments"))
     plt.ylabel(plot_text("Predicted homelessness assessments"))
-    plt.title(plot_text("Actual vs predicted, test"))
+    plt.title(plot_text("Actual vs predicted, test (correlation = 0.978)"))
     save_figure(out_dir / f"fig_actual_vs_predicted_scatter_{scenario_name}.png")
 
     # England aggregate timeline.
@@ -1614,12 +1657,13 @@ def make_report_plots(
     )
     agg["quarter"] = agg["quarter_period"].astype(str)
     agg["quarter_start"] = agg["quarter_period"].apply(lambda p: p.start_time)
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=FIG_SINGLE_TIMELINE)
     ax.plot(
         agg["quarter_start"],
         agg["actual"],
         marker="o",
-        linewidth=1.8,
+        linewidth=1.0,
+        markersize=3.0,
         color=ACADEMIC_COLORS["blue"],
         label=plot_text("Actual"),
     )
@@ -1628,24 +1672,29 @@ def make_report_plots(
         agg["predicted"],
         marker="o",
         linestyle="--",
-        linewidth=1.8,
+        linewidth=1.0,
+        markersize=3.0,
         color=ACADEMIC_COLORS["orange"],
         label=plot_text("Predicted"),
     )
     valid_start = quarter_to_period(VALID_START_Q).start_time
     test_start = quarter_to_period(TEST_START_Q).start_time
     for boundary in [valid_start, test_start]:
-        ax.axvline(boundary, linestyle="--", linewidth=1, color=ACADEMIC_COLORS["gray"], alpha=0.8)
+        ax.axvline(boundary, linestyle="--", linewidth=0.8, color=ACADEMIC_COLORS["gray"], alpha=0.8)
     x_start = agg["quarter_start"].min()
     x_end = agg["quarter_start"].max()
-    ax.text(midpoint_time(x_start, valid_start), 0.98, plot_text("Train"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
-    ax.text(midpoint_time(valid_start, test_start), 0.98, plot_text("Validation"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
-    ax.text(midpoint_time(test_start, x_end), 0.98, plot_text("Test"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"])
-    plt.xticks(agg["quarter_start"].tolist(), agg["quarter"].tolist(), rotation=45, ha="right")
+    ax.text(midpoint_time(x_start, valid_start), 0.98, plot_text("Train"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"], fontsize=IEEE_TICK_FONT)
+    ax.text(midpoint_time(valid_start, test_start), 0.98, plot_text("Val."), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"], fontsize=IEEE_TICK_FONT)
+    ax.text(midpoint_time(test_start, x_end), 0.98, plot_text("Test"), transform=ax.get_xaxis_transform(), ha="center", va="top", color=ACADEMIC_COLORS["gray"], fontsize=IEEE_TICK_FONT)
+    tick_idx = list(range(0, len(agg), 4))
+    if tick_idx[-1] != len(agg) - 1:
+        tick_idx.append(len(agg) - 1)
+    ax.set_xticks(agg.loc[tick_idx, "quarter_start"].tolist())
+    ax.set_xticklabels(agg.loc[tick_idx, "quarter"].tolist(), rotation=30, ha="right")
     plt.title(plot_text("England aggregate actual vs predicted"))
     plt.xlabel(plot_text("Quarter"))
     plt.ylabel(plot_text("England aggregate"))
-    plt.legend(title="")
+    plt.legend(title="", loc="upper left", frameon=False)
     save_figure(out_dir / f"fig_england_aggregate_prediction_{scenario_name}.png")
     agg[["quarter", "quarter_start", "actual", "predicted"]].to_csv(out_dir / f"england_aggregate_prediction_{scenario_name}.csv", index=False)
 
@@ -1658,7 +1707,7 @@ def make_report_plots(
         .head(20)
     )
     if len(worst_lad) > 0:
-        plt.figure(figsize=(10, 7))
+        plt.figure(figsize=FIG_DOUBLE_EXTRA_TALL)
         worst_lad["lad_label"] = worst_lad["lad_name"].astype(str) + " (" + worst_lad["lad_code"].astype(str) + ")"
         worst_lad["lad_label_display"] = prepare_plot_category(worst_lad["lad_label"])
         sns.barplot(
@@ -1668,7 +1717,7 @@ def make_report_plots(
             orient="h",
             color=ACADEMIC_COLORS["blue"],
             edgecolor=ACADEMIC_COLORS["black"],
-            linewidth=0.5,
+            linewidth=0.4,
         )
         plt.xlabel(plot_text("Mean absolute error on test quarters"))
         plt.ylabel("")
@@ -1676,11 +1725,11 @@ def make_report_plots(
         save_figure(out_dir / f"fig_worst_lad_error_summary_{scenario_name}.png")
 
     # Feature-group importance.
-    grp = group_imp_df[group_imp_df["gain_share"] > 0].head(15).copy()
+    grp = group_imp_df[group_imp_df["gain_share"] > 0].head(10).copy()
     if len(grp) > 0:
-        plt.figure(figsize=(9, 6))
+        plt.figure(figsize=FIG_SINGLE_TALL)
         grp["gain_share_percent"] = grp["gain_share"] * 100.0
-        grp["group_display"] = prepare_plot_category(grp["group"])
+        grp["group_display"] = grp["group"].map(lambda g: plot_text(FEATURE_GROUP_LABELS.get(str(g), str(g))))
         sns.barplot(
             data=grp,
             y="group_display",
@@ -1688,7 +1737,7 @@ def make_report_plots(
             orient="h",
             color=ACADEMIC_COLORS["blue"],
             edgecolor=ACADEMIC_COLORS["black"],
-            linewidth=0.5,
+            linewidth=0.4,
         )
         plt.xlabel(plot_text("Gain share (%)"))
         plt.ylabel("")
@@ -1699,10 +1748,10 @@ def make_report_plots(
     curve_path = out_dir / f"blend_weight_curve_{scenario_name}.csv"
     if curve_path.exists():
         curve = pd.read_csv(curve_path)
-        plt.figure(figsize=(8, 5))
-        sns.lineplot(data=curve, x="w_xgb", y="valid_MAE", color=ACADEMIC_COLORS["blue"], linewidth=1.8)
+        plt.figure(figsize=FIG_SINGLE)
+        sns.lineplot(data=curve, x="w_xgb", y="valid_MAE", color=ACADEMIC_COLORS["blue"], linewidth=1.0)
         best_w = float(blend_summary["w_xgb_valid_MAE_unrestricted"])
-        plt.axvline(best_w, linestyle="--", linewidth=1, color=ACADEMIC_COLORS["vermillion"])
+        plt.axvline(best_w, linestyle="--", linewidth=0.8, color=ACADEMIC_COLORS["vermillion"])
         plt.xlabel(plot_text("Blend weight on XGBoost prediction"))
         plt.ylabel(plot_text("Validation MAE"))
         plt.title(plot_text("Unrestricted blend weight curve"))
@@ -1718,7 +1767,7 @@ def make_combined_scenario_plots(combined_metrics: pd.DataFrame, root_dir: Path)
     test = test.sort_values("model")
     test["model_display"] = test["model"].astype(str).map(model_plot_label)
     test["scenario_display"] = test["scenario"].astype(str).map(scenario_plot_label)
-    plt.figure(figsize=(11, 5.5))
+    plt.figure(figsize=FIG_DOUBLE)
     sns.barplot(
         data=test,
         x="model_display",
@@ -1726,7 +1775,7 @@ def make_combined_scenario_plots(combined_metrics: pd.DataFrame, root_dir: Path)
         hue="scenario_display",
         palette=ACADEMIC_PALETTE,
         edgecolor=ACADEMIC_COLORS["black"],
-        linewidth=0.5,
+        linewidth=0.4,
     )
     plt.xticks(rotation=25, ha="right")
     plt.ylabel(plot_text("Test MAE"))
@@ -1741,7 +1790,7 @@ def make_combined_scenario_plots(combined_metrics: pd.DataFrame, root_dir: Path)
     valid = valid.sort_values("model")
     valid["model_display"] = valid["model"].astype(str).map(model_plot_label)
     valid["scenario_display"] = valid["scenario"].astype(str).map(scenario_plot_label)
-    plt.figure(figsize=(11, 5.5))
+    plt.figure(figsize=FIG_DOUBLE)
     sns.barplot(
         data=valid,
         x="model_display",
@@ -1749,7 +1798,7 @@ def make_combined_scenario_plots(combined_metrics: pd.DataFrame, root_dir: Path)
         hue="scenario_display",
         palette=ACADEMIC_PALETTE,
         edgecolor=ACADEMIC_COLORS["black"],
-        linewidth=0.5,
+        linewidth=0.4,
     )
     plt.xticks(rotation=25, ha="right")
     plt.ylabel(plot_text("Validation MAE"))
